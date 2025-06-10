@@ -23,7 +23,7 @@ const Login: React.FC = () => {
     try {
       const { email, password } = data;
       const response = await api.post("/auth/login", {
-        username: email,
+        identifier: email,
         password,
       });
 

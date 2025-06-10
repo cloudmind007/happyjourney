@@ -1,436 +1,461 @@
-import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { MapPin, Plus, Upload } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import IconButton from "@mui/material/IconButton";
+import { X } from "lucide-react";
+import { Box, Button, Modal } from "@mui/material";
+import { Controller, SubmitHandler, useForm } from "react-hook-form";
+import * as yup from "yup";
+import { yupResolver } from "@hookform/resolvers/yup";
+import api from "@/utils/axios";
+import LoaderModal from "./LoaderModal";
 
-type LocationFormData = {
-  stateName: string;
-  stationName: string;
-  stationCode: string;
-  pinCode: string;
-  latitude: number;
-  longitude: number;
-  zoomLevel: number;
-  status: "Published" | "Draft";
+const style = {
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  width: 900,
+  maxHeight: "67vh",
+  bgcolor: "background.paper",
+  borderRadius: 2,
+  border: "none",
+  boxShadow: "none",
+  p: 4,
 };
 
-const LocationFormModal: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [stations, setStations] = useState<LocationFormData[]>([
-    {
-      stateName: "West Bengal",
-      stationName: "Chittagong Station",
-      stationCode: "CTG001",
-      pinCode: "400001",
-      latitude: 22.3569,
-      longitude: 91.7832,
-      zoomLevel: 12,
-      status: "Published",
-    },
-    {
-      stateName: "Maharashtra",
-      stationName: "Mumbai Central",
-      stationCode: "MUM001",
-      pinCode: "400008",
-      latitude: 19.076,
-      longitude: 72.8777,
-      zoomLevel: 10,
-      status: "Draft",
-    },
-  ]);
+type FormData = {
+  stationCode: string;
+  stationName: string;
+  city: string;
+  state: string;
+  pincode: string;
+  latitude: number;
+  longitude: number;
+};
+
+interface Payload {
+  stationId?: number | null;
+  stationCode?: string;
+  stationName?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface IndiProps {
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  id: number | null;
+  mode: "add" | "edit";
+  setRefresh: React.Dispatch<React.SetStateAction<boolean>>;
+  refresh: boolean;
+  setId: React.Dispatch<React.SetStateAction<number | null>>;
+}
+
+const validationSchema = yup.object().shape({
+  stationCode: yup.string().required("Station code is required"),
+  stationName: yup.string().required("Station name is required"),
+  city: yup.string().required("City is required"),
+  state: yup.string().required("State is required"),
+  pincode: yup
+    .string()
+    .required("Pincode is required")
+    .matches(/^[0-9]+$/, "Pincode must be numeric")
+    .length(6, "Pincode must be 6 digits"),
+  latitude: yup
+    .number()
+    .required("Latitude is required")
+    .min(-90, "Latitude must be between -90 and 90")
+    .max(90, "Latitude must be between -90 and 90"),
+  longitude: yup
+    .number()
+    .required("Longitude is required")
+    .min(-180, "Longitude must be between -180 and 180")
+    .max(180, "Longitude must be between -180 and 180"),
+});
+
+export default function AddStation({
+  open,
+  setOpen,
+  id,
+  setId,
+  mode,
+  setRefresh,
+  refresh,
+}: IndiProps) {
+  const [isLoading, setIsLoading] = useState(false);
 
   const {
-    register,
     handleSubmit,
+    control,
     reset,
-    setValue,
-    formState: { errors, isSubmitting },
-  } = useForm<LocationFormData>({
+    formState: { errors },
+  } = useForm<FormData>({
+    resolver: yupResolver(validationSchema),
     defaultValues: {
-      latitude: 22.3569,
-      longitude: 91.7832,
-      zoomLevel: 10,
-      status: "Published",
+      stationCode: "",
+      stationName: "",
+      city: "",
+      state: "",
+      pincode: "",
+      latitude: 0,
+      longitude: 0,
     },
   });
 
-  const onSubmit = async (data: LocationFormData) => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    setStations((prev) => [...prev, data]);
-    console.log("Form Submitted:", data);
-
-    // Reset form and close modal
-    reset();
-    setIsOpen(false);
+  const handleClose = () => {
+    setId(null);
+    reset({
+      stationCode: "",
+      stationName: "",
+      city: "",
+      state: "",
+      pincode: "",
+      latitude: 0,
+      longitude: 0,
+    });
+    setOpen(false);
   };
 
-  const handleStatusChange = (value: string) => {
-    setValue("status", value as "Published" | "Draft");
+  useEffect(() => {
+    const fetchStationData = async () => {
+      if (mode === "edit" && id) {
+        try {
+          setIsLoading(true);
+          const res = await api.get(`/stations/${id}`);
+          if (res.status === 200 && res.data) {
+            reset({
+              stationCode: res.data.stationCode || "",
+              stationName: res.data.stationName || "",
+              city: res.data.city || "",
+              state: res.data.state || "",
+              pincode: res.data.pincode || "",
+              latitude: res.data.latitude || 0,
+              longitude: res.data.longitude || 0,
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching station data:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchStationData();
+  }, [id, mode, reset]);
+
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
+    setIsLoading(true);
+    const payload: Payload = {
+      stationCode: data.stationCode,
+      stationName: data.stationName,
+      city: data.city,
+      state: data.state,
+      pincode: data.pincode,
+      latitude: data.latitude,
+      longitude: data.longitude,
+    };
+
+    try {
+      const endpoint = mode === "edit" && id ? `/stations/${id}` : "/stations";
+      const method = mode === "edit" ? api.put : api.post;
+      if (mode === "edit" && id) {
+        payload.stationId = id;
+      }
+
+      const res = await method(endpoint, payload);
+      if (res.status === 200 || res.status === 201) {
+        setRefresh(!refresh);
+        handleClose();
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getTitle = () => {
+    switch (mode) {
+      case "add":
+        return "Add Station";
+      case "edit":
+        return "Update Station";
+      default:
+        return "";
+    }
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Station Locations</h1>
-          <p className="text-gray-600 mt-1">
-            Manage your station locations and configurations
-          </p>
-        </div>
-
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add New Station
-            </Button>
-          </DialogTrigger>
-
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Add New Location
-              </DialogTitle>
-              <DialogDescription>
-                Fill in the details below to add a new station location to your
-                network.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Main Form Fields */}
-                <div className="lg:col-span-2 space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">
-                        Basic Information
-                      </CardTitle>
-                      <CardDescription>
-                        Enter the basic details for the station location
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="stateName">State Name</Label>
-                        <Input
-                          id="stateName"
-                          {...register("stateName", {
-                            required: "State name is required",
-                            minLength: {
-                              value: 2,
-                              message:
-                                "State name must be at least 2 characters",
-                            },
-                          })}
-                          placeholder="Enter State Name"
-                          className={errors.stateName ? "border-red-500" : ""}
-                        />
-                        {errors.stateName && (
-                          <p className="text-sm text-red-500">
-                            {errors.stateName.message}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="stationName">Station Name</Label>
-                        <Input
-                          id="stationName"
-                          {...register("stationName", {
-                            required: "Station name is required",
-                            minLength: {
-                              value: 3,
-                              message:
-                                "Station name must be at least 3 characters",
-                            },
-                          })}
-                          placeholder="Enter Station Name"
-                          className={errors.stationName ? "border-red-500" : ""}
-                        />
-                        {errors.stationName && (
-                          <p className="text-sm text-red-500">
-                            {errors.stationName.message}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="stationCode">Station Code</Label>
-                        <Input
-                          id="stationCode"
-                          {...register("stationCode", {
-                            required: "Station code is required",
-                            pattern: {
-                              value: /^[A-Z]{3}[0-9]{3}$/,
-                              message:
-                                "Code must be 3 letters followed by 3 numbers (e.g., ABC123)",
-                            },
-                          })}
-                          placeholder="e.g., MUM001"
-                          className={errors.stationCode ? "border-red-500" : ""}
-                        />
-                        {errors.stationCode && (
-                          <p className="text-sm text-red-500">
-                            {errors.stationCode.message}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="pinCode">Pin Code</Label>
-                        <Input
-                          id="pinCode"
-                          {...register("pinCode", {
-                            required: "Pin code is required",
-                            pattern: {
-                              value: /^[0-9]{6}$/,
-                              message: "Pin code must be exactly 6 digits",
-                            },
-                          })}
-                          placeholder="Enter 6-digit Pin Code"
-                          className={errors.pinCode ? "border-red-500" : ""}
-                        />
-                        {errors.pinCode && (
-                          <p className="text-sm text-red-500">
-                            {errors.pinCode.message}
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">
-                        Geographic Coordinates
-                      </CardTitle>
-                      <CardDescription>
-                        Specify the exact location and map settings
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="latitude">Latitude</Label>
-                        <Input
-                          id="latitude"
-                          type="number"
-                          step="any"
-                          {...register("latitude", {
-                            required: "Latitude is required",
-                            min: {
-                              value: -90,
-                              message: "Latitude must be between -90 and 90",
-                            },
-                            max: {
-                              value: 90,
-                              message: "Latitude must be between -90 and 90",
-                            },
-                          })}
-                          className={errors.latitude ? "border-red-500" : ""}
-                        />
-                        {errors.latitude && (
-                          <p className="text-sm text-red-500">
-                            {errors.latitude.message}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="longitude">Longitude</Label>
-                        <Input
-                          id="longitude"
-                          type="number"
-                          step="any"
-                          {...register("longitude", {
-                            required: "Longitude is required",
-                            min: {
-                              value: -180,
-                              message: "Longitude must be between -180 and 180",
-                            },
-                            max: {
-                              value: 180,
-                              message: "Longitude must be between -180 and 180",
-                            },
-                          })}
-                          className={errors.longitude ? "border-red-500" : ""}
-                        />
-                        {errors.longitude && (
-                          <p className="text-sm text-red-500">
-                            {errors.longitude.message}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="zoomLevel">Map Zoom Level</Label>
-                        <Input
-                          id="zoomLevel"
-                          type="number"
-                          {...register("zoomLevel", {
-                            required: "Zoom level is required",
-                            min: {
-                              value: 1,
-                              message: "Zoom level must be between 1 and 20",
-                            },
-                            max: {
-                              value: 20,
-                              message: "Zoom level must be between 1 and 20",
-                            },
-                          })}
-                          placeholder="1-20"
-                          className={errors.zoomLevel ? "border-red-500" : ""}
-                        />
-                        {errors.zoomLevel && (
-                          <p className="text-sm text-red-500">
-                            {errors.zoomLevel.message}
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Sidebar */}
-                <div className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Status</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Select
-                        onValueChange={handleStatusChange}
-                        defaultValue="Published"
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Published">Published</SelectItem>
-                          <SelectItem value="Draft">Draft</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Station Image</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer">
-                        <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-600">
-                          Click to upload image
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          PNG, JPG up to 10MB
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSubmit(onSubmit)}
-                  disabled={isSubmitting}
-                  className="min-w-[100px]"
-                >
-                  {isSubmitting ? "Saving..." : "Save Station"}
-                </Button>
-              </DialogFooter>
+    <Modal open={open} onClose={handleClose}>
+      <Box sx={style}>
+        <div className="font-medium text-xl mb-4">{getTitle()}</div>
+        <IconButton
+          onClick={handleClose}
+          sx={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            color: "grey.500",
+          }}
+        >
+          <X />
+        </IconButton>
+        {isLoading && <LoaderModal />}
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <div className="grid md:grid-cols-2 gap-4 mb-2">
+            <div className="mb-4 w-full">
+              <label
+                className="block text-sm font-medium text-gray-700"
+                htmlFor="stationCode"
+              >
+                Station Code
+              </label>
+              <Controller
+                name="stationCode"
+                control={control}
+                render={({ field }) => (
+                  <>
+                    <input
+                      {...field}
+                      type="text"
+                      id="stationCode"
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        errors.stationCode
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      placeholder="Enter station code"
+                    />
+                    {errors.stationCode && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.stationCode.message}
+                      </p>
+                    )}
+                  </>
+                )}
+              />
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      {/* Existing Stations List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {stations.map((station, index) => (
-          <Card key={index} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">
-                    {station.stationName}
-                  </CardTitle>
-                  <CardDescription>{station.stateName}</CardDescription>
-                </div>
-                <Badge
-                  variant={
-                    station.status === "Published" ? "default" : "secondary"
-                  }
-                >
-                  {station.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Code:</span>
-                  <span className="font-mono">{station.stationCode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Pin Code:</span>
-                  <span>{station.pinCode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Coordinates:</span>
-                  <span className="font-mono text-xs">
-                    {station.latitude.toFixed(4)},{" "}
-                    {station.longitude.toFixed(4)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Zoom:</span>
-                  <span>{station.zoomLevel}x</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+            <div className="mb-4 w-full">
+              <label
+                className="block text-sm font-medium text-gray-700"
+                htmlFor="stationName"
+              >
+                Station Name
+              </label>
+              <Controller
+                name="stationName"
+                control={control}
+                render={({ field }) => (
+                  <>
+                    <input
+                      {...field}
+                      type="text"
+                      id="stationName"
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        errors.stationName
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      placeholder="Enter station name"
+                    />
+                    {errors.stationName && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.stationName.message}
+                      </p>
+                    )}
+                  </>
+                )}
+              />
+            </div>
+
+            <div className="mb-4 w-full">
+              <label
+                className="block text-sm font-medium text-gray-700"
+                htmlFor="city"
+              >
+                City
+              </label>
+              <Controller
+                name="city"
+                control={control}
+                render={({ field }) => (
+                  <>
+                    <input
+                      {...field}
+                      type="text"
+                      id="city"
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        errors.city ? "border-red-500" : "border-gray-300"
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      placeholder="Enter city"
+                    />
+                    {errors.city && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.city.message}
+                      </p>
+                    )}
+                  </>
+                )}
+              />
+            </div>
+
+            <div className="mb-4 w-full">
+              <label
+                className="block text-sm font-medium text-gray-700"
+                htmlFor="state"
+              >
+                State
+              </label>
+              <Controller
+                name="state"
+                control={control}
+                render={({ field }) => (
+                  <>
+                    <input
+                      {...field}
+                      type="text"
+                      id="state"
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        errors.state ? "border-red-500" : "border-gray-300"
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      placeholder="Enter state"
+                    />
+                    {errors.state && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.state.message}
+                      </p>
+                    )}
+                  </>
+                )}
+              />
+            </div>
+
+            <div className="mb-4 w-full">
+              <label
+                className="block text-sm font-medium text-gray-700"
+                htmlFor="pincode"
+              >
+                Pincode
+              </label>
+              <Controller
+                name="pincode"
+                control={control}
+                render={({ field }) => (
+                  <>
+                    <input
+                      {...field}
+                      type="text"
+                      id="pincode"
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        errors.pincode ? "border-red-500" : "border-gray-300"
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      placeholder="Enter pincode"
+                      maxLength={6}
+                    />
+                    {errors.pincode && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.pincode.message}
+                      </p>
+                    )}
+                  </>
+                )}
+              />
+            </div>
+
+            <div className="mb-4 w-full">
+              <label
+                className="block text-sm font-medium text-gray-700"
+                htmlFor="latitude"
+              >
+                Latitude
+              </label>
+              <Controller
+                name="latitude"
+                control={control}
+                render={({ field }) => (
+                  <>
+                    <input
+                      {...field}
+                      type="number"
+                      id="latitude"
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        errors.latitude ? "border-red-500" : "border-gray-300"
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      placeholder="Enter latitude"
+                      value={field.value || ""}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value ? Number(e.target.value) : 0
+                        )
+                      }
+                      step="0.000001"
+                    />
+                    {errors.latitude && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.latitude.message}
+                      </p>
+                    )}
+                  </>
+                )}
+              />
+            </div>
+
+            <div className="mb-4 w-full">
+              <label
+                className="block text-sm font-medium text-gray-700"
+                htmlFor="longitude"
+              >
+                Longitude
+              </label>
+              <Controller
+                name="longitude"
+                control={control}
+                render={({ field }) => (
+                  <>
+                    <input
+                      {...field}
+                      type="number"
+                      id="longitude"
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        errors.longitude ? "border-red-500" : "border-gray-300"
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      placeholder="Enter longitude"
+                      value={field.value || ""}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value ? Number(e.target.value) : 0
+                        )
+                      }
+                      step="0.000001"
+                    />
+                    {errors.longitude && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.longitude.message}
+                      </p>
+                    )}
+                  </>
+                )}
+              />
+            </div>
+          </div>
+
+          <div className="w-full flex justify-center items-center mt-4 mb-6">
+            <Button
+              type="submit"
+              variant="outlined"
+              size="medium"
+              color="primary"
+              disabled={isLoading}
+            >
+              {isLoading ? "Processing..." : "Save"}
+            </Button>
+          </div>
+        </form>
+      </Box>
+    </Modal>
   );
-};
-
-export default LocationFormModal;
+}

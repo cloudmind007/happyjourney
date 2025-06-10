@@ -1,7 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL =
-  "https://filme-liechtenstein-pills-dealtime.trycloudflare.com/api";
+const API_BASE_URL = "http://94.136.184.78:8080/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,

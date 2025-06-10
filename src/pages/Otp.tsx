@@ -1,4 +1,3 @@
-// src/pages/OtpVerification.tsx
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../utils/axios";
@@ -17,7 +16,7 @@ const OtpVerification: React.FC = () => {
     }
 
     try {
-      const res = await api.post("/auth/verify-otp", { email, otpCode: otp });
+      const res = await api.post("/auth/verify-otp", { email, otp: otp });
 
       if (res.status === 200) {
         navigate("/login");
