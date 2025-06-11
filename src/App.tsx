@@ -11,7 +11,9 @@ import Register from "./pages/Register";
 import Restaurant from "./pages/Restaurant";
 import Customer from "./pages/Customer";
 import Station from "./pages/Station";
-import AddStation from "./components/AddStation";
+import RestaurantDetail from "./pages/RestaurantDetail";
+import { Home } from "lucide-react";
+import OrderFood from "./pages/OrderFood";
 
 const App = () => {
   return (
@@ -23,6 +25,7 @@ const App = () => {
             <Route path="/register" element={<Register />} />
             <Route path="/verify-otp" element={<Otp />} />
             <Route path="/" element={<Navigate to={"/login"} replace />} />
+            <Route path="/home" element={<Home />} />
             <Route path="*" element={<div>404 Not Found</div>} />
           </Route>
           <Route element={<PrivateRoute />}>
@@ -32,7 +35,8 @@ const App = () => {
               <Route path="/restaurant" element={<Restaurant />} />
               <Route path="/customers" element={<Customer />} />
               <Route path="/stations" element={<Station />} />
-              <Route path="/stations/add" element={<AddStation />} />
+              <Route path="/orders" element={<OrderFood />} />
+              <Route path="/vender-detail/:id" element={<RestaurantDetail />} />
             </Route>
           </Route>
         </Routes>

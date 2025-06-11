@@ -1,11 +1,12 @@
 import { FC, useEffect, useState } from "react";
 import api from "../utils/axios";
 import LoaderModal from "../components/LoaderModal";
-import { Edit, Plus, Search, Trash2, X } from "lucide-react";
+import { Edit, Eye, Plus, Search, Trash2, X } from "lucide-react";
 import Pagination from "../components/Pagination";
 import { Button } from "@/components/ui/button";
 import { Box, Modal, Typography, IconButton } from "@mui/material";
 import AddVendorModal from "@/components/AddVender";
+import { useNavigate } from "react-router-dom";
 
 const style = {
   position: "absolute",
@@ -29,6 +30,7 @@ const Restaurant: FC = () => {
   const [refresh, setRefresh] = useState<boolean>(false);
   const [openModal, setOpenModal] = useState(false);
   const [mode, setMode] = useState<"add" | "edit">("add");
+  const navigate = useNavigate();
   const [page, setPage] = useState({
     current_page: 1,
     to: 0,
@@ -257,18 +259,19 @@ const Restaurant: FC = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() =>
-                                  handleOpenEditModal(item.stationId)
-                                }
+                                onClick={() => {
+                                  // handleOpenEditModal(item.stationId)
+                                  navigate(`/vender-detail/${item.vendorId}`);
+                                }}
                                 className="p-2.5"
                               >
-                                <Edit className="w-5 h-5" />
+                                <Eye className="w-5 h-5" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
-                                  setSelectedId(item.stationId);
+                                  setSelectedId(item.vendorId);
                                   setOpen(true);
                                 }}
                                 className="p-2.5 text-red-600 hover:text-red-800"
