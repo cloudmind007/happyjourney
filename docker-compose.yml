@@ -1,0 +1,27 @@
+version: '3.9'
+services:
+  react-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: react-vite-app
+    ports:
+      - "80:80"
+    restart: always
+    environment:
+      - VITE_API_BASE_URL=http://deliveryservice:8080
+    networks:
+      - my-app-network
+    depends_on:
+      - deliveryservice
+  deliveryservice:
+    container_name: deliveryservice
+    image: deliveryservice-app:latest
+    ports:
+      - "8080:8080"
+    restart: always
+    networks:
+      - my-app-network
+networks:
+  my-app-network:
+    name: my-app-network
