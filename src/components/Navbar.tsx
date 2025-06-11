@@ -1,4 +1,4 @@
-import { ChevronDown, Menu } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { menuItems } from "../constants/menuItems";
 import { useEffect, useRef, useState } from "react";

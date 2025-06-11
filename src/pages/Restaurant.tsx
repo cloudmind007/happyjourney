@@ -12,11 +12,11 @@ const style = {
   top: "50%",
   left: "50%",
   transform: "translate(-50%, -50%)",
-  width: { xs: "90%", sm: 600 }, // Responsive width
+  width: { xs: "90%", sm: 600 },
   maxWidth: "100%",
   bgcolor: "background.paper",
   borderRadius: 2,
-  p: { xs: 2, sm: 4 }, // Smaller padding on mobile
+  p: { xs: 2, sm: 4 },
   maxHeight: "90vh",
   overflowY: "auto",
 };
@@ -142,7 +142,6 @@ const Restaurant: FC = () => {
         <LoaderModal />
       ) : (
         <div className="h-full w-full">
-          {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white px-4 py-4 gap-4">
             <div className="w-full sm:w-auto">
               <div className="flex flex-col sm:flex-row gap-3">
@@ -179,11 +178,9 @@ const Restaurant: FC = () => {
             </div>
           </div>
 
-          {/* Data Display Section */}
           <div className="bg-gray-50 p-3">
             {listData.length > 0 ? (
               <div className="p-4 bg-white">
-                {/* Desktop Table */}
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="min-w-full border-separate border-spacing-y-2">
                     <thead>
@@ -286,7 +283,6 @@ const Restaurant: FC = () => {
                   </table>
                 </div>
 
-                {/* Mobile Card Layout */}
                 <div className="block sm:hidden space-y-4">
                   {listData.map((item: any, index) => (
                     <div
@@ -395,7 +391,6 @@ const Restaurant: FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       <Modal open={open} onClose={handleClose}>
         <Box sx={style}>
           <IconButton

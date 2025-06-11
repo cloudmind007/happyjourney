@@ -18,24 +18,19 @@ import {
   Avatar,
   CircularProgress,
 } from "@mui/material";
-import {
-  Controller,
-  SubmitHandler,
-  useForm,
-  FieldValues,
-} from "react-hook-form";
+import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
 import api from "@/utils/axios";
 
-interface FormData extends FieldValues {
+type FormData = {
   email: string;
   username: string;
   phone: string;
   password: string;
   businessName: string;
   description: string;
-  logoUrl: File | null;
+  logoUrl: string;
   fssaiLicense: string;
   stationId: number;
   address: string;
@@ -43,11 +38,7 @@ interface FormData extends FieldValues {
   minOrderAmount: number;
   rating: number;
   activeStatus: boolean;
-}
-
-interface Payload extends Omit<FormData, "logoUrl"> {
-  logoUrl?: string;
-}
+};
 
 interface IndiProps {
   open: boolean;
@@ -63,12 +54,6 @@ interface Station {
   stationId: number;
   stationName: string;
 }
-
-const stations: Station[] = [
-  { stationId: 1, stationName: "Station A" },
-  { stationId: 2, stationName: "Station B" },
-  { stationId: 3, stationName: "Station C" },
-];
 
 const validationSchema = yup.object().shape({
   email: yup.string().email("Invalid email").required("Email is required"),
@@ -111,8 +96,6 @@ const validationSchema = yup.object().shape({
   activeStatus: yup.boolean().required("Active status is required"),
 });
 
-const STATIC_LOGO_URL = "https://example.com/static-logo.png";
-
 export default function AddVendor({
   open,
   setOpen,
@@ -124,12 +107,13 @@ export default function AddVendor({
 }: IndiProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrlPreview, setlogoUrlPreview] = useState<string | null>(null);
-  const [stationsList, setStationsList] = useState<Station[]>(stations);
+  const [stationsList, setStationsList] = useState<Station[]>([]);
 
   const {
     handleSubmit,
     control,
     reset,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: yupResolver(validationSchema),
@@ -141,7 +125,7 @@ export default function AddVendor({
       password: "",
       businessName: "",
       description: "",
-      logoUrl: null,
+      logoUrl: "",
       fssaiLicense: "",
       stationId: 0,
       address: "",
@@ -192,7 +176,7 @@ export default function AddVendor({
               password: "",
               businessName: res.data.businessName || "",
               description: res.data.description || "",
-              logoUrl: null,
+              logoUrl: res.data.logoUrl,
               fssaiLicense: res.data.fssaiLicense || "",
               stationId: res.data.stationId || 0,
               address: res.data.address || "",
@@ -213,38 +197,6 @@ export default function AddVendor({
     fetchVendorData();
   }, [id, mode, reset]);
 
-  //   const onSubmit: SubmitHandler<FormData> = async (data) => {
-  //     setIsLoading(true);
-  //     const formData = new FormData();
-
-  //     Object.entries(data).forEach(([key, value]) => {
-  //       if (key === "logoUrl" && value instanceof File) {
-  //         formData.append("logoUrl", value);
-  //       } else if (key === "logoUrl" && !value && mode === "edit") {
-  //         return;
-  //       } else if (value !== null && value !== undefined) {
-  //         formData.append(key, value.toString());
-  //       }
-  //     });
-
-  //     try {
-  //       const endpoint =
-  //         mode === "edit" && id ? `/vendors/${id}` : "/auth/create-vendor";
-  //       const method = mode === "edit" ? api.put : api.post;
-
-  //       const res = await method(endpoint, formData, {
-  //         headers: { "Content-Type": "multipart/form-data" },
-  //       });
-  //       if (res.status === 200 || res.status === 201) {
-  //         setRefresh(!refresh);
-  //         handleClose();
-  //       }
-  //     } catch (error) {
-  //       console.error("Error submitting form:", error);
-  //     } finally {
-  //       setIsLoading(false);
-  //     }
-  //   };
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setIsLoading(true);
 
@@ -255,12 +207,11 @@ export default function AddVendor({
 
       const payload = {
         ...data,
-        logoUrl: STATIC_LOGO_URL,
         verified: true,
       };
 
       const res = await method(endpoint, payload);
-      if (res.status === 200 || res.status === 201) {
+      if (res.status === 200 || res.status === 200) {
         setRefresh(!refresh);
         handleClose();
       }
@@ -280,14 +231,25 @@ export default function AddVendor({
   ) => {
     const file = event.target.files?.[0] || null;
     onChange(file);
-    const formData = new FormData();
-    formData.append("file", file);
-    const resp = await api.post("/files/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    console.log(resp);
+
     if (file) {
-      setlogoUrlPreview(URL.createObjectURL(file));
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const resp = await api.post("/files/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        console.log(resp);
+
+        if (resp.status === 200) {
+          setValue("logoUrl", resp.data.fileUrl);
+        }
+        setlogoUrlPreview(URL.createObjectURL(file));
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        setlogoUrlPreview(null);
+      }
     } else {
       setlogoUrlPreview(null);
     }
@@ -787,7 +749,6 @@ export default function AddVendor({
             variant="contained"
             type="submit"
             disabled={isLoading || (mode === "edit" && !isDirty)}
-            onClick={handleSubmit(onSubmit)}
             sx={{ minWidth: 100 }}
           >
             {isLoading ? (
