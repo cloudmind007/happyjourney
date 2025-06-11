@@ -6,13 +6,16 @@ import Pagination from "../components/Pagination";
 import { Button } from "@/components/ui/button";
 import { Box, Modal, Typography, IconButton } from "@mui/material";
 import AddStation from "@/components/AddStation";
+import { useMediaQuery } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 
 const style = {
   position: "absolute",
   top: "50%",
   left: "50%",
   transform: "translate(-50%, -50%)",
-  width: 600,
+  width: "90%",
+  maxWidth: 600,
   bgcolor: "background.paper",
   borderRadius: 2,
   p: 4,
@@ -35,6 +38,9 @@ const Station: FC = () => {
     remainingPages: 0,
     last_page: 0,
   });
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const handleOpenAddModal = () => {
     setMode("add");
@@ -133,136 +139,197 @@ const Station: FC = () => {
   }, [refresh]);
 
   return (
-    <div>
+    <div className="overflow-x-auto">
       {loading ? (
         <LoaderModal />
       ) : (
         <div className="h-full w-full">
-          <div className="h-16 flex justify-between items-center bg-white px-4">
-            <div className="">
-              <div className="flex gap-2">
-                <div className="relative">
+          {/* Header Section - Improved for mobile */}
+          <div className="flex flex-col sm:flex-row justify-between items-center bg-white px-4 py-4 gap-4 sm:gap-0 sm:py-0 sm:h-16">
+            <div className="w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 w-full">
+                <div className="relative w-full">
                   <div className="absolute inset-y-0 left-1 rtl:inset-r-0 rtl:right-0 flex items-center ps-3 pointer-events-none">
                     <Search className="size-5 text-gray-400" />
                   </div>
                   <input
                     type="text"
                     id="searchQuery"
-                    className="max-w-md p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-3xl outline-none"
-                    placeholder="Search "
-                    // onChange={(e: any) => setSearch(e.target.value)}
+                    className="w-full p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-3xl outline-none"
+                    placeholder="Search"
                   />
-                  <select
-                    value={page.per_page}
-                    onChange={handlePageSizeChange}
-                    className="border border-gray-300 rounded-lg px-4 py-2 ml-3"
-                  >
-                    <option value={10}>10 Records Per Page</option>
-                    <option value={25}>25 Records Per Page</option>
-                    <option value={50}>50 Records Per Page</option>
-                  </select>
                 </div>
+                <select
+                  value={page.per_page}
+                  onChange={handlePageSizeChange}
+                  className="border border-gray-300 rounded-lg px-4 py-2 text-sm w-full sm:w-auto"
+                >
+                  <option value={10}>10 Records</option>
+                  <option value={25}>25 Records</option>
+                  <option value={50}>50 Records</option>
+                </select>
               </div>
             </div>
-            <div>
-              <div className="flex gap-2">
-                <div
-                  onClick={handleOpenAddModal}
-                  className="flex justify-center items-center py-1.5 px-3 gap-2 bg-[#303fe8] text-white rounded-lg font-light shadow-lg cursor-pointer"
-                >
-                  <Plus />
-                  Add
-                </div>
-              </div>
+            <div className="w-full sm:w-auto">
+              <Button
+                onClick={handleOpenAddModal}
+                className="w-full sm:w-auto flex justify-center items-center gap-2 bg-[#303fe8] hover:bg-[#303fe8]/90 text-white"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Station</span>
+              </Button>
             </div>
           </div>
+
+          {/* Main Content Area */}
           <div className="bg-gray-50 p-3">
             {listData.length > 0 ? (
-              <div className="p-4 bg-white">
-                <table className="min-w-full border-separate">
-                  <thead className="w-full">
-                    <tr className="rounded-md w-full text-center py-4">
-                      <th className="px-2 text-sm py-3 font-medium text-black">
-                        Sr. No.
-                      </th>
-                      <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
-                        Station Code
-                      </th>
-                      <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
-                        Station Name
-                      </th>
-                      <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
-                        City Name
-                      </th>
-                      <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
-                        State Name
-                      </th>
-                      <th className="px-2 text-sm py-3 text-center font-medium text-black tracking-wider">
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <div className="p-4 bg-white overflow-x-auto">
+                {isMobile ? (
+                  // Mobile view - card layout with better spacing
+                  <div className="space-y-4">
                     {listData.map((item: any, index) => (
-                      <tr
+                      <div
                         key={index}
-                        className="text-center bg-white shadow-md text-sm"
+                        className="p-4 bg-white shadow-md rounded-lg border border-gray-100"
                       >
-                        <td className="px-2 py-4 font-medium text-black rounded-tl-lg rounded-bl-lg">
-                          {(page.current_page - 1) * page.per_page + index + 1}
-                        </td>
-                        <td className="px-2 py-4 font-medium text-black">
-                          {item.stationCode}
-                        </td>
-                        <td className="px-2 py-4 font-medium text-black">
-                          {item.stationName}
-                        </td>
-                        <td className="px-2 py-4 font-medium text-black">
-                          {item.city}
-                        </td>
-                        <td className="px-2 py-4 font-medium text-black">
-                          {item.state}
-                        </td>
-                        <td className="px-2 py-4 font-medium rounded-tr-lg rounded-br-lg">
-                          <div className="flex gap-2 justify-center items-center">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                handleOpenEditModal(item.stationId)
-                              }
-                              className="p-2"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            {/* <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                console.log("View station:", item.id)
-                              }
-                              className="p-2"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button> */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedId(item.stationId);
-                                setOpen(true);
-                              }}
-                              className="p-2 text-red-600 hover:text-red-800"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                        <div className="grid grid-cols-2 gap-4 mb-3">
+                          <div>
+                            <p className="text-xs text-gray-500">Sr. No.</p>
+                            <p className="font-medium text-sm">
+                              {(page.current_page - 1) * page.per_page +
+                                index +
+                                1}
+                            </p>
                           </div>
-                        </td>
-                      </tr>
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Station Code
+                            </p>
+                            <p className="font-medium text-sm">
+                              {item.stationCode}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Station Name
+                            </p>
+                            <p className="font-medium text-sm">
+                              {item.stationName}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">City</p>
+                            <p className="font-medium text-sm">{item.city}</p>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-xs text-gray-500">State</p>
+                            <p className="font-medium text-sm">{item.state}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenEditModal(item.stationId)}
+                            className="h-8 px-2"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedId(item.stationId);
+                              setOpen(true);
+                            }}
+                            className="h-8 px-2 text-red-600 hover:text-red-800 border-red-100 hover:border-red-200"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-                <div className="w-full mt-4">
+                  </div>
+                ) : (
+                  // Desktop view - table layout
+                  <table className="min-w-full border-separate border-spacing-y-2">
+                    <thead className="w-full">
+                      <tr className="rounded-md w-full text-center py-4">
+                        <th className="px-2 text-sm py-3 font-medium text-black">
+                          Sr. No.
+                        </th>
+                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
+                          Station Code
+                        </th>
+                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
+                          Station Name
+                        </th>
+                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
+                          City Name
+                        </th>
+                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
+                          State Name
+                        </th>
+                        <th className="px-2 text-sm py-3 text-center font-medium text-black tracking-wider">
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {listData.map((item: any, index) => (
+                        <tr
+                          key={index}
+                          className="text-center bg-white shadow-md text-sm"
+                        >
+                          <td className="px-2 py-4 font-medium text-black rounded-tl-lg rounded-bl-lg">
+                            {(page.current_page - 1) * page.per_page +
+                              index +
+                              1}
+                          </td>
+                          <td className="px-2 py-4 font-medium text-black">
+                            {item.stationCode}
+                          </td>
+                          <td className="px-2 py-4 font-medium text-black">
+                            {item.stationName}
+                          </td>
+                          <td className="px-2 py-4 font-medium text-black">
+                            {item.city}
+                          </td>
+                          <td className="px-2 py-4 font-medium text-black">
+                            {item.state}
+                          </td>
+                          <td className="px-2 py-4 font-medium rounded-tr-lg rounded-br-lg">
+                            <div className="flex gap-2 justify-center items-center">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  handleOpenEditModal(item.stationId)
+                                }
+                                className="p-2"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedId(item.stationId);
+                                  setOpen(true);
+                                }}
+                                className="p-2 text-red-600 hover:text-red-800"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                <div className="w-full mt-6">
                   <Pagination
                     numOfPages={page.last_page}
                     pageNo={page.current_page}

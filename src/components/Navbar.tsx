@@ -50,9 +50,6 @@ const Navbar = () => {
       <div className="flex items-center justify-between">
         {/* Left section */}
         <div className="flex items-center">
-          <button className="lg:hidden p-2 rounded-md hover:bg-gray-100 mr-2">
-            <Menu className="w-5 h-5" />
-          </button>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
             <div className="flex items-center text-sm text-gray-500 mt-1">
@@ -69,7 +66,9 @@ const Navbar = () => {
             className="flex items-center space-x-2 focus:outline-none"
             onClick={() => setDropdownOpen(!dropdownOpen)}
           >
-            <span className="text-sm text-gray-600">Hi, Relswad</span>
+            <span className="text-sm text-gray-600 hidden sm:inline">
+              Hi, Relswad
+            </span>
             <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center">
               <span className="text-white text-sm font-medium">R</span>
             </div>
