@@ -37,9 +37,17 @@ interface IndiProps {
 const validationSchema = yup.object().shape({
   file: yup
     .mixed<FileList>()
-    .required("A CSV file is required")
-    .test("fileType", "Only CSV files are allowed", (value) => {
-      return value && value[0] && value[0].type === "text/csv";
+    .required("A file is required")
+    .test("fileType", "Only CSV or Excel files are allowed", (value) => {
+      return (
+        value &&
+        value[0] &&
+        [
+          "text/csv",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+        ].includes(value[0].type)
+      );
     })
     .test("fileSize", "File size must be less than 5MB", (value) => {
       return value && value[0] && value[0].size <= 5 * 1024 * 1024;
@@ -97,7 +105,7 @@ export default function AddCSVStation({
     <Modal open={open} onClose={handleClose}>
       <Box sx={style}>
         <div className="font-medium text-lg sm:text-xl mb-4">
-          Upload Station CSV
+          Upload Station File
         </div>
         <IconButton
           onClick={handleClose}
@@ -117,7 +125,7 @@ export default function AddCSVStation({
               className="block text-sm font-medium text-gray-700"
               htmlFor="file"
             >
-              Upload CSV File
+              Upload CSV or Excel File
             </label>
             <Controller
               name="file"
@@ -127,7 +135,7 @@ export default function AddCSVStation({
                   <input
                     type="file"
                     id="file"
-                    accept=".csv"
+                    accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       onChange(e.target.files)
                     }

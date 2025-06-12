@@ -1,192 +1,192 @@
 import { useState, useEffect } from "react";
-import api from "@/utils/axios";
 import { useParams } from "react-router-dom";
-import AddCategoryModal from "@/components/AddCategoryModal";
-import { Edit, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Edit, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import AddCategoryModal from "@/components/AddCategoryModal";
+import AddMenuItemModal from "@/components/AddMenuItemModal"; // Ensure this component exists
+import api from "@/utils/axios";
 
 interface Vendor {
   vendorId: number;
-  username: string;
-  password: string;
   businessName: string;
   description: string;
   logoUrl: string;
-  fssaiLicense: string;
-  gstNumber: string;
-  stationId: number;
-  address: string;
   preparationTimeMin: number;
-  minOrderAmount: number;
-  verified: boolean;
   rating: number;
-  activeStatus: boolean;
   veg: boolean;
 }
 
 interface Category {
-  id: number;
-  name: string;
+  categoryId: number;
+  categoryName: string;
   vendorId: number;
+  displayOrder: number;
 }
 
 interface MenuItem {
-  id: number;
-  name: string;
-  price: number;
+  itemId: number;
+  itemName: string;
+  basePrice: number;
   description: string;
   categoryId: number;
+  categoryName?: string;
   vendorId: number;
-  categoryName?: string; // Added for display purposes
+  vegetarian: boolean;
+  available: boolean;
 }
 
 const RestaurantDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isMenuItemModalOpen, setIsMenuItemModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [refresh, setRefresh] = useState<boolean>(false);
+  const [refresh, setRefresh] = useState(false);
   const [mode, setMode] = useState<"add" | "edit">("add");
   const [isMobile, setIsMobile] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
 
-  // Static vendor data
+  // Static fallback data (for error handling)
   const staticVendorData: Vendor = {
     vendorId: 1,
-    username: "vendor1",
-    password: "securepassword",
     businessName: "Tasty Bites",
     description: "A cozy restaurant serving delicious vegetarian meals.",
     logoUrl:
-      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80",
-    fssaiLicense: "FSSAI123456789",
-    gstNumber: "GSTIN987654321",
-    stationId: 101,
-    address: "123 Food Street, Flavor Town",
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80",
     preparationTimeMin: 30,
-    minOrderAmount: 200,
-    verified: true,
     rating: 4.5,
-    activeStatus: true,
     veg: true,
   };
-
-  // Static category data as fallback
-  const staticCategoryData: Category[] = [
-    { id: 1, name: "Indian", vendorId: 1 },
-    { id: 2, name: "Chinese", vendorId: 1 },
-    { id: 3, name: "Thai", vendorId: 1 },
-    { id: 4, name: "Italian", vendorId: 1 },
-    { id: 5, name: "Desserts", vendorId: 1 },
-  ];
-
-  const staticMenuItems: MenuItem[] = [
-    {
-      id: 1,
-      name: "Butter Chicken",
-      price: 250,
-      description: "Creamy tomato-based curry",
-      categoryId: 1,
-      vendorId: 1,
-      categoryName: "Indian",
-    },
-    {
-      id: 2,
-      name: "Chicken Tikka Masala",
-      price: 280,
-      description: "Grilled chicken in spiced curry",
-      categoryId: 1,
-      vendorId: 1,
-      categoryName: "Indian",
-    },
-    {
-      id: 3,
-      name: "Spring Rolls",
-      price: 180,
-      description: "Crispy vegetable rolls",
-      categoryId: 2,
-      vendorId: 1,
-      categoryName: "Chinese",
-    },
-    {
-      id: 4,
-      name: "Pad Thai",
-      price: 220,
-      description: "Stir-fried rice noodles",
-      categoryId: 3,
-      vendorId: 1,
-      categoryName: "Thai",
-    },
-  ];
 
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
-
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
-    const fetchVendor = async () => {
+    const fetchData = async () => {
       try {
-        const res = await api.get(`/vendors/${id}`);
-        setVendor(res.data);
+        // Fetch vendor
+        const vendorRes = await api.get(`/vendors/${id}`);
+        setVendor(vendorRes.data);
+
+        // Fetch categories
+        const categoriesRes = await api.get(`/menu/vendors/${id}/categories`);
+        setCategories(categoriesRes.data.content || []);
+
+        // Fetch menu items
+        const menuItemsRes = await api.get(`/menu/${id}/menu`);
+        const itemsWithCategory = menuItemsRes.data.map((item: MenuItem) => ({
+          ...item,
+          categoryName:
+            categoriesRes.data.content.find(
+              (cat: Category) => cat.categoryId === item.categoryId
+            )?.categoryName || "Uncategorized",
+        }));
+        setMenuItems(itemsWithCategory);
       } catch (error) {
-        console.error("Error fetching vendor, loading static data:", error);
+        console.error("Error fetching data, using static fallback:", error);
         setVendor(staticVendorData);
+        setCategories([
+          { categoryId: 1, categoryName: "Indian", vendorId: 1, displayOrder: 1 },
+          { categoryId: 2, categoryName: "Chinese", vendorId: 1, displayOrder: 2 },
+          { categoryId: 3, categoryName: "Thai", vendorId: 1, displayOrder: 3 },
+        ]);
+        setMenuItems([
+          {
+            itemId: 1,
+            itemName: "Butter Chicken",
+            basePrice: 250,
+            description: "Creamy tomato-based curry",
+            categoryId: 1,
+            vendorId: 1,
+            categoryName: "Indian",
+            vegetarian: false,
+            available: true,
+          },
+          {
+            itemId: 2,
+            itemName: "Chicken Tikka Masala",
+            basePrice: 280,
+            description: "Grilled chicken in spiced curry",
+            categoryId: 1,
+            vendorId: 1,
+            categoryName: "Indian",
+            vegetarian: false,
+            available: true,
+          },
+          {
+            itemId: 3,
+            itemName: "Spring Rolls",
+            basePrice: 180,
+            description: "Crispy vegetable rolls",
+            categoryId: 2,
+            vendorId: 1,
+            categoryName: "Chinese",
+            vegetarian: true,
+            available: true,
+          },
+          {
+            itemId: 4,
+            itemName: "Pad Thai",
+            basePrice: 220,
+            description: "Stir-fried rice noodles",
+            categoryId: 3,
+            vendorId: 1,
+            categoryName: "Thai",
+            vegetarian: true,
+            available: true,
+          },
+        ]);
       }
     };
 
-    const fetchCategories = async () => {
-      try {
-        const res = await api.get(`/categories?vendorId=${id}`);
-        setCategories(res.data);
-      } catch (error) {
-        console.error("Error fetching categories, loading static data:", error);
-        setCategories(staticCategoryData);
-      }
-    };
-
-    fetchVendor();
-    fetchCategories();
+    fetchData();
   }, [id, refresh]);
 
-  const handleOpenEditModal = (id: number) => {
+  const handleOpenEditModal = (id: number, type: "category" | "menuItem") => {
     setSelectedId(id);
     setMode("edit");
-    setIsModalOpen(true);
+    type === "category" ? setIsCategoryModalOpen(true) : setIsMenuItemModalOpen(true);
   };
 
-  const handleDeleteCategory = async (id: number) => {
+  const handleDelete = async (id: number, type: "category" | "menuItem") => {
     try {
-      // In a real app, you would call your API here
-      // await api.delete(`/categories/${id}`);
-
-      // For now, just filter out the deleted category
-      setCategories(categories.filter((category) => category.id !== id));
-      console.log(`Category with ID ${id} deleted successfully`);
+      if (type === "category") {
+        await api.delete(`/menu/categories/${id}`);
+        setCategories(categories.filter((cat) => cat.categoryId !== id));
+      } else {
+        await api.delete(`/api/menu/items/${id}`);
+        setMenuItems(menuItems.filter((item) => item.itemId !== id));
+      }
+      setRefresh(!refresh);
     } catch (error) {
-      console.error("Error deleting category:", error);
+      console.error(`Error deleting ${type}:`, error);
     }
+  };
+
+  const toggleCategory = (categoryId: number) => {
+    setExpandedCategory(expandedCategory === categoryId ? null : categoryId);
   };
 
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-8">
-      {/* Vendor Header Section */}
+      {/* Vendor Header */}
       <div className="relative rounded-2xl overflow-hidden shadow-lg">
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
         <img
-          src={vendor?.logoUrl}
+          src={vendor?.logoUrl || "https://via.placeholder.com/1500x500"}
           alt={vendor?.businessName}
           className="w-full h-64 object-cover"
         />
         <div className="absolute bottom-0 left-0 p-6 text-white">
-          <h1 className="text-3xl font-bold">
-            {vendor?.businessName || "Restaurant"}
-          </h1>
+          <h1 className="text-3xl font-bold">{vendor?.businessName || "Restaurant"}</h1>
           <div className="flex items-center mt-2 space-x-4">
             <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
               ⭐ {vendor?.rating || 0}
@@ -203,272 +203,232 @@ const RestaurantDetail = () => {
         </div>
       </div>
 
-      {/* Add Category Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => {
-            setMode("add");
-            setIsModalOpen(true);
-          }}
-          className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-        >
-          Add New Category
-        </button>
-      </div>
+      {/* Menu Section */}
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Menu</h2>
+          <Button
+            onClick={() => {
+              setMode("add");
+              setIsCategoryModalOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" /> Add Category
+          </Button>
+        </div>
 
-      {/* Categories Table */}
-      <div className="bg-gray-50 p-3 rounded-lg">
-        {categories.length > 0 ? (
-          <div className="p-4 bg-white overflow-x-auto rounded-lg">
-            {isMobile ? (
-              // Mobile view - card layout
-              <div className="space-y-4">
-                {categories.map((category, index) => (
+        <div className="bg-gray-50 p-3 rounded-lg">
+          {categories.length > 0 ? (
+            <div className="space-y-4">
+              {categories.map((category) => (
+                <div
+                  key={category.categoryId}
+                  className="bg-white rounded-lg shadow-md border border-gray-100"
+                >
                   <div
-                    key={category.id}
-                    className="p-4 bg-white shadow-md rounded-lg border border-gray-100"
+                    className="flex justify-between items-center p-4 cursor-pointer"
+                    onClick={() => toggleCategory(category.categoryId)}
                   >
-                    <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <p className="text-xs text-gray-500">Sr. No.</p>
-                        <p className="font-medium text-sm">{index + 1}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Category ID</p>
-                        <p className="font-medium text-sm">{category.id}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-xs text-gray-500">Category Name</p>
-                        <p className="font-medium text-sm">{category.name}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+                    <h3 className="text-lg font-semibold">{category.categoryName}</h3>
+                    <div className="flex items-center gap-2">
                       <Button
-                        size="sm"
                         variant="outline"
-                        onClick={() => handleOpenEditModal(category.id)}
-                        className="h-8 px-2"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditModal(category.categoryId, "category");
+                        }}
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button
-                        size="sm"
                         variant="outline"
-                        onClick={() => handleDeleteCategory(category.id)}
-                        className="h-8 px-2 text-red-600 hover:text-red-800 border-red-100 hover:border-red-200"
+                        size="sm"
+                        className="text-red-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(category.categoryId, "category");
+                        }}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
+                      {expandedCategory === category.categoryId ? (
+                        <ChevronUp className="w-5 h-5" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5" />
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <table className="min-w-full border-separate border-spacing-y-2">
-                <thead className="w-full">
-                  <tr className="rounded-md w-full text-center py-4">
-                    <th className="px-2 text-sm py-3 font-medium text-black">
-                      Sr. No.
-                    </th>
-                    <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
-                      Category ID
-                    </th>
-                    <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
-                      Category Name
-                    </th>
-                    <th className="px-2 text-sm py-3 text-center font-medium text-black tracking-wider">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories.map((category, index) => (
-                    <tr
-                      key={category.id}
-                      className="text-center bg-white shadow-md text-sm"
-                    >
-                      <td className="px-2 py-4 font-medium text-black rounded-tl-lg rounded-bl-lg">
-                        {index + 1}
-                      </td>
-                      <td className="px-2 py-4 font-medium text-black">
-                        {category.id}
-                      </td>
-                      <td className="px-2 py-4 font-medium text-black">
-                        {category.name}
-                      </td>
-                      <td className="px-2 py-4 font-medium rounded-tr-lg rounded-br-lg">
-                        <div className="flex gap-2 justify-center items-center">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleOpenEditModal(category.id)}
-                            className="p-2"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteCategory(category.id)}
-                            className="p-2 text-red-600 hover:text-red-800"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                  {expandedCategory === category.categoryId && (
+                    <div className="p-4 border-t border-gray-100">
+                      <div className="flex justify-end mb-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setMode("add");
+                            setIsMenuItemModalOpen(true);
+                            setSelectedId(category.categoryId);
+                          }}
+                        >
+                          <Plus className="mr-2 h-4 w-4" /> Add Menu Item
+                        </Button>
+                      </div>
+                      {menuItems.filter((item) => item.categoryId === category.categoryId).length > 0 ? (
+                        <div className="overflow-x-auto">
+                          {isMobile ? (
+                            <div className="space-y-4">
+                              {menuItems
+                                .filter((item) => item.categoryId === category.categoryId)
+                                .map((item, index) => (
+                                  <div
+                                    key={item.itemId}
+                                    className="p-4 bg-gray-50 rounded-lg border border-gray-100"
+                                  >
+                                    <div className="grid grid-cols-2 gap-4 mb-3">
+                                      <div>
+                                        <p className="text-xs text-gray-500">Sr. No.</p>
+                                        <p className="font-medium text-sm">{index + 1}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-gray-500">Item ID</p>
+                                        <p className="font-medium text-sm">{item.itemId}</p>
+                                      </div>
+                                      <div className="col-span-2">
+                                        <p className="text-xs text-gray-500">Item Name</p>
+                                        <p className="font-medium text-sm">{item.itemName}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-gray-500">Price</p>
+                                        <p className="font-medium text-sm">₹{item.basePrice}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-gray-500">Vegetarian</p>
+                                        <p className="font-medium text-sm">
+                                          {item.vegetarian ? "Yes" : "No"}
+                                        </p>
+                                      </div>
+                                      <div className="col-span-2">
+                                        <p className="text-xs text-gray-500">Description</p>
+                                        <p className="font-medium text-sm">{item.description}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleOpenEditModal(item.itemId, "menuItem")}
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-red-600"
+                                        onClick={() => handleDelete(item.itemId, "menuItem")}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          ) : (
+                            <table className="min-w-full border-separate border-spacing-y-2">
+                              <thead>
+                                <tr className="rounded-md text-center">
+                                  <th className="px-2 py-3 font-medium text-black">Sr. No.</th>
+                                  <th className="px-2 py-3 font-medium text-black">Item ID</th>
+                                  <th className="px-2 py-3 font-medium text-black">Item Name</th>
+                                  <th className="px-2 py-3 font-medium text-black">Price</th>
+                                  <th className="px-2 py-3 font-medium text-black">Vegetarian</th>
+                                  <th className="px-2 py-3 font-medium text-black">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {menuItems
+                                  .filter((item) => item.categoryId === category.categoryId)
+                                  .map((item, index) => (
+                                    <tr
+                                      key={item.itemId}
+                                      className="text-center bg-gray-50 shadow-md text-sm"
+                                    >
+                                      <td className="px-2 py-4 rounded-tl-lg rounded-bl-lg">
+                                        {index + 1}
+                                      </td>
+                                      <td className="px-2 py-4">{item.itemId}</td>
+                                      <td className="px-2 py-4 font-medium">{item.itemName}</td>
+                                      <td className="px-2 py-4">₹{item.basePrice}</td>
+                                      <td className="px-2 py-4">
+                                        {item.vegetarian ? "Yes" : "No"}
+                                      </td>
+                                      <td className="px-2 py-4 rounded-tr-lg rounded-br-lg">
+                                        <div className="flex gap-2 justify-center">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleOpenEditModal(item.itemId, "menuItem")
+                                            }
+                                          >
+                                            <Edit className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-red-600"
+                                            onClick={() => handleDelete(item.itemId, "menuItem")}
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                              </tbody>
+                            </table>
+                          )}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center mt-12">
-            <h2 className="text-xl font-semibold mb-4">No Categories Found</h2>
-            <p className="text-gray-500">
-              Add your first category to get started
-            </p>
-          </div>
-        )}
-      </div>
-      {/* Add Category Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => {
-            setMode("add");
-            setIsModalOpen(true);
-          }}
-          className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-        >
-          Add New Menu
-        </button>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-4">
+                          <p className="text-gray-500">No menu items found in this category</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-8">
+              <h3 className="text-lg font-medium">No Categories Found</h3>
+              <p className="text-gray-500">Add your first category</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Categories Table */}
-      <div className="bg-gray-50 p-3 rounded-lg">
-        {categories.length > 0 ? (
-          <div className="p-4 bg-white overflow-x-auto rounded-lg">
-            {isMobile ? (
-              // Mobile view - card layout
-              <div className="space-y-4">
-                {categories.map((category, index) => (
-                  <div
-                    key={category.id}
-                    className="p-4 bg-white shadow-md rounded-lg border border-gray-100"
-                  >
-                    <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <p className="text-xs text-gray-500">Sr. No.</p>
-                        <p className="font-medium text-sm">{index + 1}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Category ID</p>
-                        <p className="font-medium text-sm">{category.id}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-xs text-gray-500">Category Name</p>
-                        <p className="font-medium text-sm">{category.name}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleOpenEditModal(category.id)}
-                        className="h-8 px-2"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDeleteCategory(category.id)}
-                        className="h-8 px-2 text-red-600 hover:text-red-800 border-red-100 hover:border-red-200"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <table className="min-w-full border-separate border-spacing-y-2">
-                <thead className="w-full">
-                  <tr className="rounded-md w-full text-center py-4">
-                    <th className="px-2 text-sm py-3 font-medium text-black">
-                      Sr. No.
-                    </th>
-                    <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
-                      Category ID
-                    </th>
-                    <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">
-                      Category Name
-                    </th>
-                    <th className="px-2 text-sm py-3 text-center font-medium text-black tracking-wider">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories.map((category, index) => (
-                    <tr
-                      key={category.id}
-                      className="text-center bg-white shadow-md text-sm"
-                    >
-                      <td className="px-2 py-4 font-medium text-black rounded-tl-lg rounded-bl-lg">
-                        {index + 1}
-                      </td>
-                      <td className="px-2 py-4 font-medium text-black">
-                        {category.id}
-                      </td>
-                      <td className="px-2 py-4 font-medium text-black">
-                        {category.name}
-                      </td>
-                      <td className="px-2 py-4 font-medium rounded-tr-lg rounded-br-lg">
-                        <div className="flex gap-2 justify-center items-center">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleOpenEditModal(category.id)}
-                            className="p-2"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteCategory(category.id)}
-                            className="p-2 text-red-600 hover:text-red-800"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center mt-12">
-            <h2 className="text-xl font-semibold mb-4">No Categories Found</h2>
-            <p className="text-gray-500">
-              Add your first category to get started
-            </p>
-          </div>
-        )}
-      </div>
-
+      {/* Modals */}
       <AddCategoryModal
-        open={isModalOpen}
-        setOpen={setIsModalOpen}
+        open={isCategoryModalOpen}
+        setOpen={setIsCategoryModalOpen}
         id={selectedId}
         setId={setSelectedId}
         mode={mode}
         setRefresh={setRefresh}
         refresh={refresh}
         vendorId={Number(id)}
+      />
+      <AddMenuItemModal
+        open={isMenuItemModalOpen}
+        setOpen={setIsMenuItemModalOpen}
+        id={selectedId}
+        setId={setSelectedId}
+        mode={mode}
+        setRefresh={setRefresh}
+        refresh={refresh}
+        vendorId={Number(id)}
+        categories={categories}
       />
     </div>
   );
