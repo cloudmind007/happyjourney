@@ -69,9 +69,9 @@ const validationSchema = yup.object().shape({
   }),
   businessName: yup.string().required("Business name is required"),
   description: yup.string().required("Description is required"),
-  logoUrl: yup.mixed<File>().when("$mode", {
+  logoUrl: yup.string().when("$mode", {
     is: "add",
-    then: (schema) => schema.required("logoUrl is required"),
+    then: (schema) => schema.required("Logo URL is required"),
     otherwise: (schema) => schema.notRequired(),
   }),
   fssaiLicense: yup.string().required("FSSAI License is required"),
@@ -176,7 +176,7 @@ export default function AddVendor({
               password: "",
               businessName: res.data.businessName || "",
               description: res.data.description || "",
-              logoUrl: res.data.logoUrl,
+              logoUrl: res.data.logoUrl || "",
               fssaiLicense: res.data.fssaiLicense || "",
               stationId: res.data.stationId || 0,
               address: res.data.address || "",
@@ -211,7 +211,7 @@ export default function AddVendor({
       };
 
       const res = await method(endpoint, payload);
-      if (res.status === 200 || res.status === 200) {
+      if (res.status === 200 || res.status === 201) {
         setRefresh(!refresh);
         handleClose();
       }
@@ -221,6 +221,7 @@ export default function AddVendor({
       setIsLoading(false);
     }
   };
+
   const getTitle = (): string => {
     return mode === "add" ? "Add New Vendor" : "Edit Vendor Details";
   };
@@ -550,7 +551,7 @@ export default function AddVendor({
 
               <Box>
                 <Typography variant="body2" gutterBottom sx={{ mb: 1 }}>
-                  Business logoUrl {mode === "edit" && "(Optional)"}
+                  Business Logo {mode === "edit" && "(Optional)"}
                 </Typography>
                 <Controller
                   name="logoUrl"
@@ -577,7 +578,7 @@ export default function AddVendor({
                       {logoUrlPreview ? (
                         <Avatar
                           src={logoUrlPreview}
-                          alt="logoUrl Preview"
+                          alt="Logo Preview"
                           sx={{ width: 56, height: 56 }}
                           variant="rounded"
                         />
@@ -725,40 +726,41 @@ export default function AddVendor({
               </Box>
             </Box>
           </Box>
-        </Box>
 
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 2,
-            mt: 3,
-            pt: 2,
-            borderTop: "1px solid",
-            borderColor: "divider",
-          }}
-        >
-          <Button
-            variant="outlined"
-            onClick={handleClose}
-            sx={{ minWidth: 100 }}
+          {/* Moved buttons inside the form */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 2,
+              mt: 3,
+              pt: 2,
+              borderTop: "1px solid",
+              borderColor: "divider",
+            }}
           >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            type="submit"
-            disabled={isLoading || (mode === "edit" && !isDirty)}
-            sx={{ minWidth: 100 }}
-          >
-            {isLoading ? (
-              <CircularProgress size={24} color="inherit" />
-            ) : mode === "add" ? (
-              "Create Vendor"
-            ) : (
-              "Save Changes"
-            )}
-          </Button>
+            <Button
+              variant="outlined"
+              onClick={handleClose}
+              sx={{ minWidth: 100 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              type="submit"
+              disabled={isLoading || (mode === "edit" && !isDirty)}
+              sx={{ minWidth: 100 }}
+            >
+              {isLoading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : mode === "add" ? (
+                "Create Vendor"
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </Box>
         </Box>
       </Box>
     </Modal>

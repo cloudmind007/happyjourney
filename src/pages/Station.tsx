@@ -8,6 +8,7 @@ import { Box, Modal, Typography, IconButton } from "@mui/material";
 import AddStation from "@/components/AddStation";
 import { useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import AddCSVStation from "@/components/AddCSVStation";
 
 const style = {
   position: "absolute",
@@ -28,6 +29,7 @@ const Station: FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [refresh, setRefresh] = useState<boolean>(false);
   const [openModal, setOpenModal] = useState(false);
+  const [openCSV, setOpenCSV] = useState(false);
   const [mode, setMode] = useState<"add" | "edit">("add");
   const [page, setPage] = useState({
     current_page: 1,
@@ -62,7 +64,7 @@ const Station: FC = () => {
   const handleDelete = async () => {
     try {
       const res = await api.delete(`/stations/${selectedId}`);
-      if (res.status === 200) {
+      if (res.status === 204) {
         setRefresh(!refresh);
       }
     } catch (error) {
@@ -171,13 +173,25 @@ const Station: FC = () => {
               </div>
             </div>
             <div className="w-full sm:w-auto">
-              <Button
-                onClick={handleOpenAddModal}
-                className="w-full sm:w-auto flex justify-center items-center gap-2 bg-[#303fe8] hover:bg-[#303fe8]/90 text-white"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Station</span>
-              </Button>
+              <div className="flex gap-2 flex-col lg:flex-row">
+                {" "}
+                <Button
+                  onClick={handleOpenAddModal}
+                  className="w-full sm:w-auto flex justify-center items-center gap-2 bg-[#303fe8] hover:bg-[#303fe8]/90 text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add Station</span>
+                </Button>
+                <Button
+                  onClick={() => {
+                    setOpenCSV(true);
+                  }}
+                  className="w-full sm:w-auto flex justify-center items-center gap-2 bg-[#303fe8] hover:bg-[#303fe8]/90 text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Upload File</span>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -388,6 +402,13 @@ const Station: FC = () => {
         id={selectedId}
         setId={setSelectedId}
         mode={mode}
+        setRefresh={setRefresh}
+        refresh={refresh}
+      />
+
+      <AddCSVStation
+        open={openCSV}
+        setOpen={setOpenCSV}
         setRefresh={setRefresh}
         refresh={refresh}
       />

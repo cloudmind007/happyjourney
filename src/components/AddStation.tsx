@@ -13,13 +13,14 @@ const style = {
   top: "50%",
   left: "50%",
   transform: "translate(-50%, -50%)",
-  width: 900,
-  maxHeight: "67vh",
+  width: { xs: "90vw", sm: "80vw", md: 900 }, // Responsive width
+  maxHeight: { xs: "85vh", sm: "75vh" }, // Adaptive max height
   bgcolor: "background.paper",
   borderRadius: 2,
   border: "none",
   boxShadow: "none",
-  p: 4,
+  p: { xs: 2, sm: 4 }, // Reduced padding on mobile
+  overflowY: "auto", // Scrollable content
 };
 
 type FormData = {
@@ -191,7 +192,7 @@ export default function AddStation({
   return (
     <Modal open={open} onClose={handleClose}>
       <Box sx={style}>
-        <div className="font-medium text-xl mb-4">{getTitle()}</div>
+        <div className="font-medium text-lg sm:text-xl mb-4">{getTitle()}</div>
         <IconButton
           onClick={handleClose}
           sx={{
@@ -201,11 +202,11 @@ export default function AddStation({
             color: "grey.500",
           }}
         >
-          <X />
+          <X size={20} />
         </IconButton>
         {isLoading && <LoaderModal />}
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="grid md:grid-cols-2 gap-4 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
             <div className="mb-4 w-full">
               <label
                 className="block text-sm font-medium text-gray-700"
@@ -222,15 +223,15 @@ export default function AddStation({
                       {...field}
                       type="text"
                       id="stationCode"
-                      className={`mt-1 block w-full px-3 py-2 border ${
+                      className={`mt-1 block w-full px-3 py-2.5 border ${
                         errors.stationCode
                           ? "border-red-500"
                           : "border-gray-300"
-                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base`}
                       placeholder="Enter station code"
                     />
                     {errors.stationCode && (
-                      <p className="mt-1 text-sm text-red-600">
+                      <p className="mt-1 text-xs sm:text-sm text-red-600">
                         {errors.stationCode.message}
                       </p>
                     )}
@@ -255,15 +256,15 @@ export default function AddStation({
                       {...field}
                       type="text"
                       id="stationName"
-                      className={`mt-1 block w-full px-3 py-2 border ${
+                      className={`mt-1 block w-full px-3 py-2.5 border ${
                         errors.stationName
                           ? "border-red-500"
                           : "border-gray-300"
-                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base`}
                       placeholder="Enter station name"
                     />
                     {errors.stationName && (
-                      <p className="mt-1 text-sm text-red-600">
+                      <p className="mt-1 text-xs sm:text-sm text-red-600">
                         {errors.stationName.message}
                       </p>
                     )}
@@ -288,13 +289,13 @@ export default function AddStation({
                       {...field}
                       type="text"
                       id="city"
-                      className={`mt-1 block w-full px-3 py-2 border ${
+                      className={`mt-1 block w-full px-3 py-2.5 border ${
                         errors.city ? "border-red-500" : "border-gray-300"
-                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base`}
                       placeholder="Enter city"
                     />
                     {errors.city && (
-                      <p className="mt-1 text-sm text-red-600">
+                      <p className="mt-1 text-xs sm:text-sm text-red-600">
                         {errors.city.message}
                       </p>
                     )}
@@ -319,13 +320,13 @@ export default function AddStation({
                       {...field}
                       type="text"
                       id="state"
-                      className={`mt-1 block w-full px-3 py-2 border ${
+                      className={`mt-1 block w-full px-3 py-2.5 border ${
                         errors.state ? "border-red-500" : "border-gray-300"
-                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base`}
                       placeholder="Enter state"
                     />
                     {errors.state && (
-                      <p className="mt-1 text-sm text-red-600">
+                      <p className="mt-1 text-xs sm:text-sm text-red-600">
                         {errors.state.message}
                       </p>
                     )}
@@ -350,14 +351,14 @@ export default function AddStation({
                       {...field}
                       type="text"
                       id="pincode"
-                      className={`mt-1 block w-full px-3 py-2 border ${
+                      className={`mt-1 block w-full px-3 py-2.5 border ${
                         errors.pincode ? "border-red-500" : "border-gray-300"
-                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base`}
                       placeholder="Enter pincode"
                       maxLength={6}
                     />
                     {errors.pincode && (
-                      <p className="mt-1 text-sm text-red-600">
+                      <p className="mt-1 text-xs sm:text-sm text-red-600">
                         {errors.pincode.message}
                       </p>
                     )}
@@ -382,9 +383,9 @@ export default function AddStation({
                       {...field}
                       type="number"
                       id="latitude"
-                      className={`mt-1 block w-full px-3 py-2 border ${
+                      className={`mt-1 block w-full px-3 py-2.5 border ${
                         errors.latitude ? "border-red-500" : "border-gray-300"
-                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base`}
                       placeholder="Enter latitude"
                       value={field.value || ""}
                       onChange={(e) =>
@@ -395,7 +396,7 @@ export default function AddStation({
                       step="0.000001"
                     />
                     {errors.latitude && (
-                      <p className="mt-1 text-sm text-red-600">
+                      <p className="mt-1 text-xs sm:text-sm text-red-600">
                         {errors.latitude.message}
                       </p>
                     )}
@@ -420,9 +421,9 @@ export default function AddStation({
                       {...field}
                       type="number"
                       id="longitude"
-                      className={`mt-1 block w-full px-3 py-2 border ${
+                      className={`mt-1 block w-full px-3 py-2.5 border ${
                         errors.longitude ? "border-red-500" : "border-gray-300"
-                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base`}
                       placeholder="Enter longitude"
                       value={field.value || ""}
                       onChange={(e) =>
@@ -433,7 +434,7 @@ export default function AddStation({
                       step="0.000001"
                     />
                     {errors.longitude && (
-                      <p className="mt-1 text-sm text-red-600">
+                      <p className="mt-1 text-xs sm:text-sm text-red-600">
                         {errors.longitude.message}
                       </p>
                     )}
@@ -450,6 +451,7 @@ export default function AddStation({
               size="medium"
               color="primary"
               disabled={isLoading}
+              sx={{ px: 4, py: 1.5 }}
             >
               {isLoading ? "Processing..." : "Save"}
             </Button>
