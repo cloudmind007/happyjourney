@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Modal, Box, IconButton, Button } from "@mui/material";
 import { X } from "lucide-react";
@@ -9,7 +8,7 @@ import api from "@/utils/axios";
 import LoaderModal from "@/components/LoaderModal";
 
 const style = {
-  position: "absolute",
+  position: "absolute" as const,
   top: "50%",
   left: "50%",
   transform: "translate(-50%, -50%)",
@@ -26,30 +25,14 @@ const style = {
 interface FormData {
   itemName: string;
   basePrice: string;
-  description: string;
+  vendorPrice?: string;
+  description?: string;
   categoryId: string;
   vegetarian: boolean;
   available: boolean;
-  preparationTimeMin: string;
-  imageUrl: string;
-  displayOrder: string;
-  availableStartTime: string;
-  availableEndTime: string;
-  itemCategory: string;
-}
-
-interface Payload {
-  itemId?: number;
-  itemName?: string;
-  basePrice?: number;
-  description?: string;
-  categoryId?: number;
-  vendorId?: number;
-  vegetarian?: boolean;
-  available?: boolean;
-  preparationTimeMin?: number;
+  preparationTimeMin?: string;
   imageUrl?: string;
-  displayOrder?: number;
+  displayOrder?: string;
   availableStartTime?: string;
   availableEndTime?: string;
   itemCategory?: string;
@@ -58,7 +41,7 @@ interface Payload {
 interface Props {
   open: boolean;
   setOpen: (open: boolean) => void;
-  id: number | null; // categoryId for add, itemId for edit
+  id: number | null;
   setId: (id: number | null) => void;
   mode: "add" | "edit";
   setRefresh: (refresh: boolean) => void;
@@ -73,14 +56,25 @@ const validationSchema = yup.object().shape({
     .string()
     .required("Price is required")
     .matches(/^\d+(\.\d{1,2})?$/, "Price must be a valid number"),
+  vendorPrice: yup
+    .string()
+    .optional()
+    .matches(/^\d+(\.\d{1,2})?$/, "Vendor price must be a valid number")
+    .test("less-than-base", "Vendor price must be less than base price", function (value) {
+      if (!value) return true;
+      const basePrice = Number(this.parent.basePrice);
+      return Number(value) < basePrice;
+    }),
   categoryId: yup.string().required("Category is required"),
-  description: yup.string(),
-  preparationTimeMin: yup.string().matches(/^\d*$/, "Preparation time must be a number"),
-  displayOrder: yup.string().matches(/^\d*$/, "Display order must be a number"),
-  imageUrl: yup.string().url("Must be a valid URL").nullable(),
-  availableStartTime: yup.string(),
-  availableEndTime: yup.string(),
-  itemCategory: yup.string(),
+  description: yup.string().optional(),
+  preparationTimeMin: yup.string().matches(/^\d*$/, "Preparation time must be a number").optional(),
+  displayOrder: yup.string().matches(/^\d*$/, "Display order must be a number").optional(),
+  imageUrl: yup.string().url("Must be a valid URL").nullable().optional(),
+  availableStartTime: yup.string().optional(),
+  availableEndTime: yup.string().optional(),
+  itemCategory: yup.string().optional(),
+  vegetarian: yup.boolean().optional(),
+  available: yup.boolean().optional(),
 });
 
 const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh, vendorId, categories }: Props) => {
@@ -97,6 +91,7 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
     defaultValues: {
       itemName: "",
       basePrice: "",
+      vendorPrice: "",
       description: "",
       categoryId: id?.toString() || "",
       vegetarian: false,
@@ -115,11 +110,12 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
       if (mode === "edit" && id) {
         try {
           setIsLoading(true);
-          const res = await api.get(`/api/menu/items/${id}`);
+          const res = await api.get(`/menu/items/${id}`);
           if (res.status === 200 && res.data) {
             reset({
               itemName: res.data.itemName || "",
               basePrice: res.data.basePrice?.toString() || "",
+              vendorPrice: res.data.vendorPrice?.toString() || "",
               description: res.data.description || "",
               categoryId: res.data.categoryId?.toString() || "",
               vegetarian: res.data.vegetarian || false,
@@ -140,39 +136,18 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
         }
       }
     };
-
     fetchItemData();
   }, [id, mode, reset]);
-
-  const handleClose = () => {
-    setId(null);
-    reset({
-      itemName: "",
-      basePrice: "",
-      description: "",
-      categoryId: "",
-      vegetarian: false,
-      available: true,
-      preparationTimeMin: "",
-      imageUrl: "",
-      displayOrder: "",
-      availableStartTime: "",
-      availableEndTime: "",
-      itemCategory: "",
-    });
-    setOpen(false);
-    setError(null);
-  };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setIsLoading(true);
     setError(null);
-    const payload: Payload = {
+    const payload = {
       itemName: data.itemName,
       basePrice: Number(data.basePrice) || undefined,
+      vendorPrice: data.vendorPrice ? Number(data.vendorPrice) : undefined,
       description: data.description || undefined,
       categoryId: Number(data.categoryId) || undefined,
-      vendorId,
       vegetarian: data.vegetarian,
       available: data.available,
       preparationTimeMin: Number(data.preparationTimeMin) || undefined,
@@ -181,15 +156,12 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
       availableStartTime: data.availableStartTime || undefined,
       availableEndTime: data.availableEndTime || undefined,
       itemCategory: data.itemCategory || undefined,
+      ...(mode === "edit" && id ? { itemId: id } : {}),
     };
 
     try {
-      const endpoint = mode === "edit" && id ? `/api/menu/items/${id}` : "/api/menu/items";
+      const endpoint = mode === "edit" && id ? `menu/items/${id}` : "/menu/items";
       const method = mode === "edit" ? api.put : api.post;
-      if (mode === "edit" && id) {
-        payload.itemId = id;
-      }
-
       const res = await method(endpoint, payload);
       if (res.status === 200 || res.status === 201) {
         setRefresh(!refresh);
@@ -197,26 +169,26 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
       }
     } catch (error: any) {
       console.error("Error submitting form:", error);
-      setError(error.response?.data?.message || "Failed to save menu item. Please try again.");
+      setError(error.response?.data?.message || "Failed to save menu item.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleClose = () => {
+    setId(null);
+    reset();
+    setOpen(false);
+    setError(null);
+  };
+
   return (
     <Modal open={open} onClose={handleClose}>
       <Box sx={style}>
-        <div className="font-medium text-xl mb-4">
-          {mode === "add" ? "Add Menu Item" : "Update Menu Item"}
-        </div>
+        <div className="font-medium text-xl mb-4">{mode === "add" ? "Add Menu Item" : "Update Menu Item"}</div>
         <IconButton
           onClick={handleClose}
-          sx={{
-            position: "absolute",
-            top: 8,
-            right: 8,
-            color: "grey.500",
-          }}
+          sx={{ position: "absolute", top: 8, right: 8, color: "grey.500" }}
         >
           <X />
         </IconButton>
@@ -251,7 +223,7 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
             </div>
             <div className="mb-4 w-full">
               <label className="block text-sm font-medium text-gray-700" htmlFor="basePrice">
-                Price
+                Base Price
               </label>
               <Controller
                 name="basePrice"
@@ -260,16 +232,40 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
                   <>
                     <input
                       {...field}
-                      type="number"
+                      type="text"
                       id="basePrice"
-                      step="0.01"
                       className={`mt-1 block w-full px-3 py-2 border ${
                         errors.basePrice ? "border-red-500" : "border-gray-300"
                       } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
-                      placeholder="Enter price"
+                      placeholder="Enter base price"
                     />
                     {errors.basePrice && (
                       <p className="mt-1 text-sm text-red-600">{errors.basePrice.message}</p>
+                    )}
+                  </>
+                )}
+              />
+            </div>
+            <div className="mb-4 w-full">
+              <label className="block text-sm font-medium text-gray-700" htmlFor="vendorPrice">
+                Vendor Price
+              </label>
+              <Controller
+                name="vendorPrice"
+                control={control}
+                render={({ field }) => (
+                  <>
+                    <input
+                      {...field}
+                      type="text"
+                      id="vendorPrice"
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        errors.vendorPrice ? "border-red-500" : "border-gray-300"
+                      } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
+                      placeholder="Enter vendor price"
+                    />
+                    {errors.vendorPrice && (
+                      <p className="mt-1 text-sm text-red-600">{errors.vendorPrice.message}</p>
                     )}
                   </>
                 )}
@@ -368,10 +364,7 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
               />
             </div>
             <div className="mb-4 w-full">
-              <label
-                className="block text-sm font-medium text-gray-700"
-                htmlFor="preparationTimeMin"
-              >
+              <label className="block text-sm font-medium text-gray-700" htmlFor="preparationTimeMin">
                 Preparation Time (min)
               </label>
               <Controller
@@ -381,7 +374,7 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
                   <>
                     <input
                       {...field}
-                      type="number"
+                      type="text"
                       id="preparationTimeMin"
                       className={`mt-1 block w-full px-3 py-2 border ${
                         errors.preparationTimeMin ? "border-red-500" : "border-gray-300"
@@ -389,9 +382,7 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
                       placeholder="Enter preparation time"
                     />
                     {errors.preparationTimeMin && (
-                      <p className="mt-1 text-sm text-red-600">
-                        {errors.preparationTimeMin.message}
-                      </p>
+                      <p className="mt-1 text-sm text-red-600">{errors.preparationTimeMin.message}</p>
                     )}
                   </>
                 )}
@@ -433,7 +424,7 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
                   <>
                     <input
                       {...field}
-                      type="number"
+                      type="text"
                       id="displayOrder"
                       className={`mt-1 block w-full px-3 py-2 border ${
                         errors.displayOrder ? "border-red-500" : "border-gray-300"
@@ -448,10 +439,7 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
               />
             </div>
             <div className="mb-4 w-full">
-              <label
-                className="block text-sm font-medium text-gray-700"
-                htmlFor="availableStartTime"
-              >
+              <label className="block text-sm font-medium text-gray-700" htmlFor="availableStartTime">
                 Available Start Time
               </label>
               <Controller
@@ -468,19 +456,14 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
                       } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
                     />
                     {errors.availableStartTime && (
-                      <p className="mt-1 text-sm text-red-600">
-                        {errors.availableStartTime.message}
-                      </p>
+                      <p className="mt-1 text-sm text-red-600">{errors.availableStartTime.message}</p>
                     )}
                   </>
                 )}
               />
             </div>
             <div className="mb-4 w-full">
-              <label
-                className="block text-sm font-medium text-gray-700"
-                htmlFor="availableEndTime"
-              >
+              <label className="block text-sm font-medium text-gray-700" htmlFor="availableEndTime">
                 Available End Time
               </label>
               <Controller
@@ -497,9 +480,7 @@ const AddMenuItemModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
                       } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
                     />
                     {errors.availableEndTime && (
-                      <p className="mt-1 text-sm text-red-600">
-                        {errors.availableEndTime.message}
-                      </p>
+                      <p className="mt-1 text-sm text-red-600">{errors.availableEndTime.message}</p>
                     )}
                   </>
                 )}
