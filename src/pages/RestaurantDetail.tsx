@@ -43,8 +43,13 @@ interface MenuItem {
   itemCategory?: string;
 }
 
-const RestaurantDetail = () => {
-  const { id } = useParams<{ id: string }>();
+interface RestaurantDetailProps {
+  vendorId?: number;
+  isViewOnly?: boolean;
+}
+
+const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnly = false }) => {
+  const { id: urlId } = useParams<{ id: string }>();
   const { role } = useAuth();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -57,10 +62,11 @@ const RestaurantDetail = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
 
+  const effectiveVendorId = vendorId || Number(urlId);
   const isVendor = role?.toLowerCase() === "vendor";
 
   const staticVendorData: Vendor = {
-    vendorId: 1,
+    vendorId: effectiveVendorId,
     businessName: "Tasty Bites",
     description: "A cozy restaurant serving delicious vegetarian meals.",
     logoUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80",
@@ -81,14 +87,14 @@ const RestaurantDetail = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const vendorRes = await api.get(`/vendors/${id}`);
+        const vendorRes = await api.get(`/vendors/${effectiveVendorId}`);
         setVendor(vendorRes.data);
 
-        const categoriesRes = await api.get(`/menu/vendors/${id}/categories`);
+        const categoriesRes = await api.get(`/menu/vendors/${effectiveVendorId}/categories`);
         const fetchedCategories = categoriesRes.data.content || [];
         setCategories(fetchedCategories);
 
-        const menuItemsRes = await api.get(`/menu/vendors/${id}/items`);
+        const menuItemsRes = await api.get(`/menu/vendors/${effectiveVendorId}/items`);
         const itemsWithCategory = menuItemsRes.data.map((item: MenuItem) => ({
           ...item,
           categoryName:
@@ -100,9 +106,9 @@ const RestaurantDetail = () => {
         console.error("Error fetching data, using static fallback:", error);
         setVendor(staticVendorData);
         const fallbackCategories = [
-          { categoryId: 1, categoryName: "Indian", vendorId: 1, displayOrder: 1 },
-          { categoryId: 2, categoryName: "Chinese", vendorId: 1, displayOrder: 2 },
-          { categoryId: 3, categoryName: "Thai", vendorId: 1, displayOrder: 3 },
+          { categoryId: 1, categoryName: "Indian", vendorId: effectiveVendorId, displayOrder: 1 },
+          { categoryId: 2, categoryName: "Chinese", vendorId: effectiveVendorId, displayOrder: 2 },
+          { categoryId: 3, categoryName: "Thai", vendorId: effectiveVendorId, displayOrder: 3 },
         ];
         setCategories(fallbackCategories);
         setMenuItems([
@@ -112,7 +118,7 @@ const RestaurantDetail = () => {
             basePrice: 250,
             description: "Creamy tomato-based curry",
             categoryId: 1,
-            vendorId: 1,
+            vendorId: effectiveVendorId,
             vegetarian: false,
             available: true,
           },
@@ -122,7 +128,7 @@ const RestaurantDetail = () => {
             basePrice: 280,
             description: "Grilled chicken in spiced curry",
             categoryId: 1,
-            vendorId: 1,
+            vendorId: effectiveVendorId,
             vegetarian: false,
             available: true,
           },
@@ -132,7 +138,7 @@ const RestaurantDetail = () => {
             basePrice: 180,
             description: "Crispy vegetable rolls",
             categoryId: 2,
-            vendorId: 1,
+            vendorId: effectiveVendorId,
             vegetarian: true,
             available: true,
           },
@@ -142,7 +148,7 @@ const RestaurantDetail = () => {
             basePrice: 220,
             description: "Stir-fried rice noodles",
             categoryId: 3,
-            vendorId: 1,
+            vendorId: effectiveVendorId,
             vegetarian: true,
             available: true,
           },
@@ -150,7 +156,7 @@ const RestaurantDetail = () => {
       }
     };
     fetchData();
-  }, [id, refresh]);
+  }, [effectiveVendorId, refresh]);
 
   const handleOpenEditModal = (id: number, type: "category" | "menuItem") => {
     setSelectedId(id);
@@ -209,7 +215,7 @@ const RestaurantDetail = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Menu</h2>
-          {!isVendor && (
+          {!isViewOnly && !isVendor && (
             <Button
               onClick={() => {
                 setMode("add");
@@ -236,7 +242,7 @@ const RestaurantDetail = () => {
                     >
                       <h3 className="text-lg font-semibold">{category.categoryName}</h3>
                       <div className="flex items-center gap-2">
-                        {!isVendor && (
+                        {!isViewOnly && !isVendor && (
                           <>
                             <Button
                               variant="outline"
@@ -270,7 +276,7 @@ const RestaurantDetail = () => {
                     </div>
                     {expandedCategory === category.categoryId && (
                       <div className="p-4 border-t border-gray-100">
-                        {!isVendor && (
+                        {!isViewOnly && !isVendor && (
                           <div className="flex justify-end mb-4">
                             <Button
                               variant="outline"
@@ -320,7 +326,7 @@ const RestaurantDetail = () => {
                                         <p className="font-medium text-sm">{item.description}</p>
                                       </div>
                                     </div>
-                                    {!isVendor && (
+                                    {!isViewOnly && !isVendor && (
                                       <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
                                         <Button
                                           variant="outline"
@@ -351,7 +357,7 @@ const RestaurantDetail = () => {
                                     <th className="px-2 py-3 font-medium text-black">Item Name</th>
                                     <th className="px-2 py-3 font-medium text-black">Price</th>
                                     <th className="px-2 py-3 font-medium text-black">Vegetarian</th>
-                                    {!isVendor && (
+                                    {!isViewOnly && !isVendor && (
                                       <th className="px-2 py-3 font-medium text-black">Actions</th>
                                     )}
                                   </tr>
@@ -367,7 +373,7 @@ const RestaurantDetail = () => {
                                       <td className="px-2 py-4 font-medium">{item.itemName}</td>
                                       <td className="px-2 py-4">₹{item.basePrice}</td>
                                       <td className="px-2 py-4">{item.vegetarian ? "Yes" : "No"}</td>
-                                      {!isVendor && (
+                                      {!isViewOnly && !isVendor && (
                                         <td className="px-2 py-4 rounded-tr-lg rounded-br-lg">
                                           <div className="flex gap-2 justify-center">
                                             <Button
@@ -408,12 +414,12 @@ const RestaurantDetail = () => {
           ) : (
             <div className="flex flex-col items-center justify-center p-8">
               <h3 className="text-lg font-medium">No Categories Found</h3>
-              <p className="text-gray-500">{isVendor ? "No categories available" : "Add your first category"}</p>
+              <p className="text-gray-500">{isViewOnly || isVendor ? "No categories available" : "Add your first category"}</p>
             </div>
           )}
         </div>
       </div>
-      {!isVendor && (
+      {!isViewOnly && !isVendor && (
         <>
           <AddCategoryModal
             open={isCategoryModalOpen}
@@ -423,7 +429,7 @@ const RestaurantDetail = () => {
             mode={mode}
             setRefresh={setRefresh}
             refresh={refresh}
-            vendorId={Number(id)}
+            vendorId={effectiveVendorId}
           />
           <AddMenuItemModal
             open={isMenuItemModalOpen}
@@ -433,7 +439,7 @@ const RestaurantDetail = () => {
             mode={mode}
             setRefresh={setRefresh}
             refresh={refresh}
-            vendorId={Number(id)}
+            vendorId={effectiveVendorId}
             categories={categories}
           />
         </>
@@ -442,4 +448,4 @@ const RestaurantDetail = () => {
   );
 };
 
-export default RestaurantDetail;
+export default RestaurantDetail
