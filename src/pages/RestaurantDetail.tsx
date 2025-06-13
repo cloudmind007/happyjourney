@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import AddCategoryModal from "@/components/AddCategoryModal";
 import AddMenuItemModal from "@/components/AddMenuItemModal";
 import api from "@/utils/axios";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Vendor {
   vendorId: number;
@@ -44,6 +45,7 @@ interface MenuItem {
 
 const RestaurantDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const { role } = useAuth();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -54,6 +56,8 @@ const RestaurantDetail = () => {
   const [mode, setMode] = useState<"add" | "edit">("add");
   const [isMobile, setIsMobile] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
+
+  const isVendor = role?.toLowerCase() === "vendor";
 
   const staticVendorData: Vendor = {
     vendorId: 1,
@@ -77,16 +81,13 @@ const RestaurantDetail = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch vendor
         const vendorRes = await api.get(`/vendors/${id}`);
         setVendor(vendorRes.data);
 
-        // Fetch categories
         const categoriesRes = await api.get(`/menu/vendors/${id}/categories`);
         const fetchedCategories = categoriesRes.data.content || [];
         setCategories(fetchedCategories);
 
-        // Fetch menu items
         const menuItemsRes = await api.get(`/menu/vendors/${id}/items`);
         const itemsWithCategory = menuItemsRes.data.map((item: MenuItem) => ({
           ...item,
@@ -162,7 +163,6 @@ const RestaurantDetail = () => {
       if (type === "category") {
         await api.delete(`/menu/categories/${id}`);
         setCategories(categories.filter((cat) => cat.categoryId !== id));
-        // Also remove menu items that belong to this category
         setMenuItems(menuItems.filter((item) => item.categoryId !== id));
       } else {
         await api.delete(`/menu/items/${id}`);
@@ -178,7 +178,6 @@ const RestaurantDetail = () => {
     setExpandedCategory(expandedCategory === categoryId ? null : categoryId);
   };
 
-  // Sort categories by displayOrder
   const sortedCategories = [...categories].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
   return (
@@ -210,14 +209,16 @@ const RestaurantDetail = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Menu</h2>
-          <Button
-            onClick={() => {
-              setMode("add");
-              setIsCategoryModalOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" /> Add Category
-          </Button>
+          {!isVendor && (
+            <Button
+              onClick={() => {
+                setMode("add");
+                setIsCategoryModalOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add Category
+            </Button>
+          )}
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
           {sortedCategories.length > 0 ? (
@@ -235,27 +236,31 @@ const RestaurantDetail = () => {
                     >
                       <h3 className="text-lg font-semibold">{category.categoryName}</h3>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenEditModal(category.categoryId, "category");
-                          }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(category.categoryId, "category");
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {!isVendor && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEditModal(category.categoryId, "category");
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(category.categoryId, "category");
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
                         {expandedCategory === category.categoryId ? (
                           <ChevronUp className="w-5 h-5" />
                         ) : (
@@ -265,19 +270,21 @@ const RestaurantDetail = () => {
                     </div>
                     {expandedCategory === category.categoryId && (
                       <div className="p-4 border-t border-gray-100">
-                        <div className="flex justify-end mb-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setMode("add");
-                              setIsMenuItemModalOpen(true);
-                              setSelectedId(category.categoryId);
-                            }}
-                          >
-                            <Plus className="mr-2 h-4 w-4" /> Add Menu Item
-                          </Button>
-                        </div>
+                        {!isVendor && (
+                          <div className="flex justify-end mb-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setMode("add");
+                                setIsMenuItemModalOpen(true);
+                                setSelectedId(category.categoryId);
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" /> Add Menu Item
+                            </Button>
+                          </div>
+                        )}
                         {categoryItems.length > 0 ? (
                           <div className="overflow-x-auto">
                             {isMobile ? (
@@ -313,23 +320,25 @@ const RestaurantDetail = () => {
                                         <p className="font-medium text-sm">{item.description}</p>
                                       </div>
                                     </div>
-                                    <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleOpenEditModal(item.itemId, "menuItem")}
-                                      >
-                                        <Edit className="w-4 h-4" />
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-red-600"
-                                        onClick={() => handleDelete(item.itemId, "menuItem")}
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    </div>
+                                    {!isVendor && (
+                                      <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleOpenEditModal(item.itemId, "menuItem")}
+                                        >
+                                          <Edit className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="text-red-600"
+                                          onClick={() => handleDelete(item.itemId, "menuItem")}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -342,7 +351,9 @@ const RestaurantDetail = () => {
                                     <th className="px-2 py-3 font-medium text-black">Item Name</th>
                                     <th className="px-2 py-3 font-medium text-black">Price</th>
                                     <th className="px-2 py-3 font-medium text-black">Vegetarian</th>
-                                    <th className="px-2 py-3 font-medium text-black">Actions</th>
+                                    {!isVendor && (
+                                      <th className="px-2 py-3 font-medium text-black">Actions</th>
+                                    )}
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -356,25 +367,27 @@ const RestaurantDetail = () => {
                                       <td className="px-2 py-4 font-medium">{item.itemName}</td>
                                       <td className="px-2 py-4">₹{item.basePrice}</td>
                                       <td className="px-2 py-4">{item.vegetarian ? "Yes" : "No"}</td>
-                                      <td className="px-2 py-4 rounded-tr-lg rounded-br-lg">
-                                        <div className="flex gap-2 justify-center">
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleOpenEditModal(item.itemId, "menuItem")}
-                                          >
-                                            <Edit className="w-4 h-4" />
-                                          </Button>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-red-600"
-                                            onClick={() => handleDelete(item.itemId, "menuItem")}
-                                          >
-                                            <Trash2 className="w-4 h-4" />
-                                          </Button>
-                                        </div>
-                                      </td>
+                                      {!isVendor && (
+                                        <td className="px-2 py-4 rounded-tr-lg rounded-br-lg">
+                                          <div className="flex gap-2 justify-center">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => handleOpenEditModal(item.itemId, "menuItem")}
+                                            >
+                                              <Edit className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="text-red-600"
+                                              onClick={() => handleDelete(item.itemId, "menuItem")}
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                          </div>
+                                        </td>
+                                      )}
                                     </tr>
                                   ))}
                                 </tbody>
@@ -395,32 +408,36 @@ const RestaurantDetail = () => {
           ) : (
             <div className="flex flex-col items-center justify-center p-8">
               <h3 className="text-lg font-medium">No Categories Found</h3>
-              <p className="text-gray-500">Add your first category</p>
+              <p className="text-gray-500">{isVendor ? "No categories available" : "Add your first category"}</p>
             </div>
           )}
         </div>
       </div>
-      <AddCategoryModal
-        open={isCategoryModalOpen}
-        setOpen={setIsCategoryModalOpen}
-        id={selectedId}
-        setId={setSelectedId}
-        mode={mode}
-        setRefresh={setRefresh}
-        refresh={refresh}
-        vendorId={Number(id)}
-      />
-      <AddMenuItemModal
-        open={isMenuItemModalOpen}
-        setOpen={setIsMenuItemModalOpen}
-        id={selectedId}
-        setId={setSelectedId}
-        mode={mode}
-        setRefresh={setRefresh}
-        refresh={refresh}
-        vendorId={Number(id)}
-        categories={categories}
-      />
+      {!isVendor && (
+        <>
+          <AddCategoryModal
+            open={isCategoryModalOpen}
+            setOpen={setIsCategoryModalOpen}
+            id={selectedId}
+            setId={setSelectedId}
+            mode={mode}
+            setRefresh={setRefresh}
+            refresh={refresh}
+            vendorId={Number(id)}
+          />
+          <AddMenuItemModal
+            open={isMenuItemModalOpen}
+            setOpen={setIsMenuItemModalOpen}
+            id={selectedId}
+            setId={setSelectedId}
+            mode={mode}
+            setRefresh={setRefresh}
+            refresh={refresh}
+            vendorId={Number(id)}
+            categories={categories}
+          />
+        </>
+      )}
     </div>
   );
 };

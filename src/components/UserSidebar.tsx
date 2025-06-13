@@ -1,14 +1,14 @@
 import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { adminMenuItems } from "../constants/menuItems";
+import { userMenuItems } from "../constants/menuItems";
 import { Menu } from "lucide-react";
 
-type SidebarProps = {
+type UserSidebarProps = {
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
+const UserSidebar: React.FC<UserSidebarProps> = ({ collapsed, setCollapsed }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -31,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
       className={`h-full ${collapsed ? "w-20" : "w-64"} bg-white shadow-sm border-r transition-all duration-300`}
     >
       <div className="flex items-center justify-between p-4">
-        {!collapsed && <h1 className="text-xl font-bold text-gray-800">RELSWAD</h1>}
+        {!collapsed && <h1 className="text-xl font-bold text-gray-800">User Portal</h1>}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="p-2 rounded hover:bg-gray-100 transition"
@@ -40,7 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
         </button>
       </div>
       <nav className="mt-4">
-        {adminMenuItems.map((item, index) => {
+        {userMenuItems.map((item, index) => {
           const isActive = location.pathname === item.path;
           return (
             <div key={index} className="px-2 py-1">
@@ -68,4 +68,4 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
   );
 };
 
-export default Sidebar;
+export default UserSidebar;
