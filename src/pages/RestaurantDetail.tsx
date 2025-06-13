@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { ChevronDown, ChevronUp, Edit, Trash2, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Edit, Trash2, Plus, Star, Clock, Leaf, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AddCategoryModal from "@/components/AddCategoryModal";
 import AddMenuItemModal from "@/components/AddMenuItemModal";
@@ -188,6 +188,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
 
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-8">
+      {/* Restaurant Header */}
       <div className="relative rounded-2xl overflow-hidden shadow-lg">
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
         <img
@@ -199,34 +200,44 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
           <h1 className="text-3xl font-bold">{vendor?.businessName || "Restaurant"}</h1>
           <div className="flex items-center mt-2 space-x-4">
             <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
-              ⭐ {vendor?.rating || 0}
+              <Star className="w-4 h-4 mr-1" />
+              {vendor?.rating || 0}
             </span>
             <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
-              🕒 {vendor?.preparationTimeMin || 0} min
+              <Clock className="w-4 h-4 mr-1" />
+              {vendor?.preparationTimeMin || 0} min
             </span>
             {vendor?.veg && (
               <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
-                🌱 Vegetarian
+                <Leaf className="w-4 h-4 mr-1" />
+                Vegetarian
               </span>
             )}
           </div>
         </div>
       </div>
+
+      {/* Menu Section */}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Menu</h2>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+            <Utensils className="w-5 h-5 mr-2 text-amber-500" />
+            Menu
+          </h2>
           {!isViewOnly && !isVendor && (
             <Button
               onClick={() => {
                 setMode("add");
                 setIsCategoryModalOpen(true);
               }}
+              className="bg-amber-600 hover:bg-amber-700"
             >
               <Plus className="mr-2 h-4 w-4" /> Add Category
             </Button>
           )}
         </div>
-        <div className="bg-gray-50 p-3 rounded-lg">
+
+        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
           {sortedCategories.length > 0 ? (
             <div className="space-y-4">
               {sortedCategories.map((category) => {
@@ -234,19 +245,20 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                 return (
                   <div
                     key={category.categoryId}
-                    className="bg-white rounded-lg shadow-md border border-gray-100"
+                    className="bg-white rounded-lg shadow-sm border border-gray-200 hover:border-amber-300 transition-colors"
                   >
                     <div
                       className="flex justify-between items-center p-4 cursor-pointer"
                       onClick={() => toggleCategory(category.categoryId)}
                     >
-                      <h3 className="text-lg font-semibold">{category.categoryName}</h3>
+                      <h3 className="text-lg font-semibold text-gray-800">{category.categoryName}</h3>
                       <div className="flex items-center gap-2">
                         {!isViewOnly && !isVendor && (
                           <>
                             <Button
                               variant="outline"
                               size="sm"
+                              className="text-blue-600 border-blue-200 hover:bg-blue-50"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOpenEditModal(category.categoryId, "category");
@@ -257,7 +269,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                             <Button
                               variant="outline"
                               size="sm"
-                              className="text-red-600"
+                              className="text-red-600 border-red-200 hover:bg-red-50"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(category.categoryId, "category");
@@ -268,9 +280,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                           </>
                         )}
                         {expandedCategory === category.categoryId ? (
-                          <ChevronUp className="w-5 h-5" />
+                          <ChevronUp className="w-5 h-5 text-gray-500" />
                         ) : (
-                          <ChevronDown className="w-5 h-5" />
+                          <ChevronDown className="w-5 h-5 text-gray-500" />
                         )}
                       </div>
                     </div>
@@ -281,6 +293,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                             <Button
                               variant="outline"
                               size="sm"
+                              className="bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100"
                               onClick={() => {
                                 setMode("add");
                                 setIsMenuItemModalOpen(true);
@@ -298,7 +311,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                                 {categoryItems.map((item, index) => (
                                   <div
                                     key={item.itemId}
-                                    className="p-4 bg-gray-50 rounded-lg border border-gray-100"
+                                    className="p-4 bg-gray-50 rounded-lg border border-gray-200"
                                   >
                                     <div className="grid grid-cols-2 gap-4 mb-3">
                                       <div>
@@ -319,7 +332,15 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                                       </div>
                                       <div>
                                         <p className="text-xs text-gray-500">Vegetarian</p>
-                                        <p className="font-medium text-sm">{item.vegetarian ? "Yes" : "No"}</p>
+                                        <p className="font-medium text-sm">
+                                          {item.vegetarian ? (
+                                            <span className="text-green-600 flex items-center">
+                                              <Leaf className="w-3 h-3 mr-1" /> Yes
+                                            </span>
+                                          ) : (
+                                            "No"
+                                          )}
+                                        </p>
                                       </div>
                                       <div className="col-span-2">
                                         <p className="text-xs text-gray-500">Description</p>
@@ -331,6 +352,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                                         <Button
                                           variant="outline"
                                           size="sm"
+                                          className="text-blue-600 border-blue-200 hover:bg-blue-50"
                                           onClick={() => handleOpenEditModal(item.itemId, "menuItem")}
                                         >
                                           <Edit className="w-4 h-4" />
@@ -338,7 +360,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                                         <Button
                                           variant="outline"
                                           size="sm"
-                                          className="text-red-600"
+                                          className="text-red-600 border-red-200 hover:bg-red-50"
                                           onClick={() => handleDelete(item.itemId, "menuItem")}
                                         >
                                           <Trash2 className="w-4 h-4" />
@@ -351,14 +373,15 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                             ) : (
                               <table className="min-w-full border-separate border-spacing-y-2">
                                 <thead>
-                                  <tr className="rounded-md text-center">
-                                    <th className="px-2 py-3 font-medium text-black">Sr. No.</th>
-                                    <th className="px-2 py-3 font-medium text-black">Item ID</th>
-                                    <th className="px-2 py-3 font-medium text-black">Item Name</th>
-                                    <th className="px-2 py-3 font-medium text-black">Price</th>
-                                    <th className="px-2 py-3 font-medium text-black">Vegetarian</th>
+                                  <tr className="text-left">
+                                    <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100 rounded-l-lg">Sr. No.</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Item ID</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Item Name</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Price</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Vegetarian</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Description</th>
                                     {!isViewOnly && !isVendor && (
-                                      <th className="px-2 py-3 font-medium text-black">Actions</th>
+                                      <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100 rounded-r-lg">Actions</th>
                                     )}
                                   </tr>
                                 </thead>
@@ -366,19 +389,29 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                                   {categoryItems.map((item, index) => (
                                     <tr
                                       key={item.itemId}
-                                      className="text-center bg-gray-50 shadow-md text-sm"
+                                      className="text-sm hover:bg-gray-50 transition-colors"
                                     >
-                                      <td className="px-2 py-4 rounded-tl-lg rounded-bl-lg">{index + 1}</td>
-                                      <td className="px-2 py-4">{item.itemId}</td>
-                                      <td className="px-2 py-4 font-medium">{item.itemName}</td>
-                                      <td className="px-2 py-4">₹{item.basePrice}</td>
-                                      <td className="px-2 py-4">{item.vegetarian ? "Yes" : "No"}</td>
+                                      <td className="px-4 py-3 rounded-l-lg border border-gray-100">{index + 1}</td>
+                                      <td className="px-4 py-3 border border-gray-100">{item.itemId}</td>
+                                      <td className="px-4 py-3 font-medium border border-gray-100">{item.itemName}</td>
+                                      <td className="px-4 py-3 border border-gray-100">₹{item.basePrice}</td>
+                                      <td className="px-4 py-3 border border-gray-100">
+                                        {item.vegetarian ? (
+                                          <span className="text-green-600 flex items-center">
+                                            <Leaf className="w-3 h-3 mr-1" /> Yes
+                                          </span>
+                                        ) : (
+                                          "No"
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3 border border-gray-100 text-gray-600">{item.description}</td>
                                       {!isViewOnly && !isVendor && (
-                                        <td className="px-2 py-4 rounded-tr-lg rounded-br-lg">
-                                          <div className="flex gap-2 justify-center">
+                                        <td className="px-4 py-3 rounded-r-lg border border-gray-100">
+                                          <div className="flex gap-2">
                                             <Button
                                               variant="outline"
                                               size="sm"
+                                              className="text-blue-600 border-blue-200 hover:bg-blue-50"
                                               onClick={() => handleOpenEditModal(item.itemId, "menuItem")}
                                             >
                                               <Edit className="w-4 h-4" />
@@ -386,7 +419,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                                             <Button
                                               variant="outline"
                                               size="sm"
-                                              className="text-red-600"
+                                              className="text-red-600 border-red-200 hover:bg-red-50"
                                               onClick={() => handleDelete(item.itemId, "menuItem")}
                                             >
                                               <Trash2 className="w-4 h-4" />
@@ -401,7 +434,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                             )}
                           </div>
                         ) : (
-                          <div className="flex flex-col items-center justify-center p-4">
+                          <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                             <p className="text-gray-500">No menu items found in this category</p>
                           </div>
                         )}
@@ -412,13 +445,17 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
               })}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center p-8">
-              <h3 className="text-lg font-medium">No Categories Found</h3>
-              <p className="text-gray-500">{isViewOnly || isVendor ? "No categories available" : "Add your first category"}</p>
+            <div className="flex flex-col items-center justify-center p-8 bg-white rounded-lg border border-dashed border-gray-300">
+              <h3 className="text-lg font-medium text-gray-700">No Categories Found</h3>
+              <p className="text-gray-500 mt-1">
+                {isViewOnly || isVendor ? "No categories available" : "Add your first category"}
+              </p>
             </div>
           )}
         </div>
       </div>
+
+      {/* Modals */}
       {!isViewOnly && !isVendor && (
         <>
           <AddCategoryModal
@@ -448,4 +485,4 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
   );
 };
 
-export default RestaurantDetail
+export default RestaurantDetail;
