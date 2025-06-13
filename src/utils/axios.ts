@@ -11,9 +11,10 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// In api.ts, update the request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("admin_token");
+    const token = localStorage.getItem("accessToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

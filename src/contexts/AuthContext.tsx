@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
-interface AuthContextType {
+type AuthContextType = {
   accessToken: string | null;
   role: string | null;
   username: string | null;
   userId: number | null;
-  login: (data: { accessToken: string; role: string; username?: string; userId?: number }) => void;
+  login: (data: { accessToken: string; role: string; username: string; userId: number }) => void;
   logout: () => void;
-}
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -19,20 +19,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.getItem("userId") ? Number(localStorage.getItem("userId")) : null
   );
 
-  const login = ({ accessToken, role, username, userId }: AuthContextType["login"]["arguments"]) => {
-    const normalizedRole = role.toLowerCase();
-    console.log("Login role:", { raw: role, normalized: normalizedRole, userId, username });
-    setAccessToken(accessToken);
-    setRole(normalizedRole);
-    setUsername(username || null);
-    setUserId(userId || null);
-    localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("role", normalizedRole);
-    if (username) localStorage.setItem("username", username);
-    if (userId) localStorage.setItem("userId", userId.toString());
+  const login = (data: { accessToken: string; role: string; username: string; userId: number }) => {
+    console.log("Logging in with data:", data); // Debug
+    setAccessToken(data.accessToken);
+    setRole(data.role.toLowerCase()); // Normalize to lowercase
+    setUsername(data.username);
+    setUserId(data.userId);
+    localStorage.setItem("accessToken", data.accessToken);
+    localStorage.setItem("role", data.role.toLowerCase());
+    localStorage.setItem("username", data.username);
+    localStorage.setItem("userId", String(data.userId));
   };
 
   const logout = () => {
+    console.log("Logging out"); // Debug
     setAccessToken(null);
     setRole(null);
     setUsername(null);

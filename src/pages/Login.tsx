@@ -18,47 +18,53 @@ const Login: React.FC = () => {
     formState: { errors },
     setError,
   } = useForm<LoginFormInputs>();
+// Update the onSubmit function in Login.tsx
+const onSubmit = async (data: LoginFormInputs) => {
+  try {
+    const { email, password } = data;
+    const response = await api.post("/auth/login", {
+      identifier: email,
+      password,
+    });
 
-  const onSubmit = async (data: LoginFormInputs) => {
-    try {
-      const { email, password } = data;
-      const response = await api.post("/auth/login", {
-        identifier: email,
-        password,
+    if (response.status === 200 && response.data.accessToken) {
+      const { accessToken, role, name: username, userId } = response.data;
+      login({ 
+        accessToken, 
+        role, 
+        username, 
+        userId 
       });
 
-      if (response.status === 200 && response.data.accessToken && response.data.role) {
-        const { accessToken, role } = response.data;
-        login(accessToken, role); // Pass accessToken and role to AuthContext
-
-        // Redirect based on role (case-insensitive)
-        switch (role.toLowerCase()) {
-          case "admin":
-            navigate("/dashboard");
-            break;
-          case "user":
-            navigate("/home");
-            break;
-          case "vendor":
-            navigate("/vendor/home");
-            break;
-          default:
-            throw new Error("Unknown role");
-        }
-      } else {
-        throw new Error("Invalid response");
+      // Redirect based on role (case-insensitive)
+      const normalizedRole = role.toLowerCase();
+      switch (normalizedRole) {
+        case "admin":
+          navigate("/dashboard");
+          break;
+        case "user":
+          navigate("/home");
+          break;
+        case "vendor":
+          navigate("/vendor/home");
+          break;
+        default:
+          throw new Error("Unknown role");
       }
-    } catch (error) {
-      setError("email", {
-        type: "manual",
-        message: "Invalid email or password",
-      });
-      setError("password", {
-        type: "manual",
-        message: "Invalid email or password",
-      });
+    } else {
+      throw new Error("Invalid response");
     }
-  };
+  } catch (error) {
+    setError("email", {
+      type: "manual",
+      message: "Invalid email or password",
+    });
+    setError("password", {
+      type: "manual",
+      message: "Invalid email or password",
+    });
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
