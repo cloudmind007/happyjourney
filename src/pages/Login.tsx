@@ -27,9 +27,24 @@ const Login: React.FC = () => {
         password,
       });
 
-      if (response.status === 200 && response.data.token) {
-        login(response.data.token);
-        navigate("/dashboard");
+      if (response.status === 200 && response.data.accessToken && response.data.role) {
+        const { accessToken, role } = response.data;
+        login(accessToken, role); // Pass accessToken and role to AuthContext
+
+        // Redirect based on role (case-insensitive)
+        switch (role.toLowerCase()) {
+          case "admin":
+            navigate("/dashboard");
+            break;
+          case "user":
+            navigate("/home");
+            break;
+          case "vendor":
+            navigate("/vendor/home");
+            break;
+          default:
+            throw new Error("Unknown role");
+        }
       } else {
         throw new Error("Invalid response");
       }
@@ -116,7 +131,7 @@ const Login: React.FC = () => {
         </form>
 
         <p className="mt-4 text-sm text-gray-500 text-center">
-          don't have an account?{" "}
+          Don't have an account?{" "}
           <a href="/register" className="text-blue-600 hover:underline">
             Sign Up
           </a>

@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useState, useCallback, useRef } from "react";
 import api from "../utils/axios";
 import LoaderModal from "../components/LoaderModal";
 import { Edit, Plus, Search, Trash2, X } from "lucide-react";
@@ -9,6 +9,7 @@ import AddStation from "@/components/AddStation";
 import { useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import AddCSVStation from "@/components/AddCSVStation";
+import debounce from "lodash.debounce";
 
 const style = {
   position: "absolute",
@@ -31,6 +32,10 @@ const Station: FC = () => {
   const [openModal, setOpenModal] = useState(false);
   const [openCSV, setOpenCSV] = useState(false);
   const [mode, setMode] = useState<"add" | "edit">("add");
+  const [stationCodeInput, setStationCodeInput] = useState("");
+  const [cityInput, setCityInput] = useState("");
+  const [stationCodeFilter, setStationCodeFilter] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
   const [page, setPage] = useState({
     current_page: 1,
     to: 0,
@@ -40,6 +45,11 @@ const Station: FC = () => {
     remainingPages: 0,
     last_page: 0,
   });
+
+  // Refs for input elements to manage focus
+  const stationCodeInputRef = useRef<HTMLInputElement>(null);
+  const cityInputRef = useRef<HTMLInputElement>(null);
+  const activeInputRef = useRef<"stationCode" | "city" | null>(null);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -62,6 +72,7 @@ const Station: FC = () => {
   };
 
   const handleDelete = async () => {
+    setLoading(true);
     try {
       const res = await api.delete(`/stations/${selectedId}`);
       if (res.status === 204) {
@@ -71,20 +82,29 @@ const Station: FC = () => {
       console.error("Failed to delete data:", error);
     } finally {
       setLoading(false);
+      handleClose();
     }
   };
 
-  const getData = async (pageNumber = 1, pageSize = 10) => {
+  const getData = async (
+    pageNumber = 1,
+    pageSize = 10,
+    filters = { stationCode: "", city: "" }
+  ) => {
     setLoading(true);
     try {
-      const res = await api.get(
-        `/stations?page=${pageNumber - 1}&size=${pageSize}`
-      );
+      const queryParams = new URLSearchParams({
+        page: (pageNumber - 1).toString(),
+        size: pageSize.toString(),
+      });
+      if (filters.stationCode) queryParams.append("stationCode", filters.stationCode);
+      if (filters.city) queryParams.append("stationName", filters.city);
+
+      const res = await api.get(`/stations?${queryParams.toString()}`);
 
       setListData(res.data.content || []);
 
-      const { pageable, numberOfElements, totalElements, totalPages } =
-        res.data;
+      const { pageable, numberOfElements, totalElements, totalPages } = res.data;
 
       setPage((prev) => {
         const newPage = {
@@ -118,12 +138,62 @@ const Station: FC = () => {
     }
   };
 
+  // Debounced functions for applying filters
+  const debouncedStationCodeFilter = useCallback(
+    debounce((value: string) => {
+      setStationCodeFilter(value);
+      setPage((prev) => ({ ...prev, current_page: 1 }));
+      getData(1, page.per_page, { stationCode: value, city: cityFilter });
+    }, 300),
+    [cityFilter, page.per_page]
+  );
+
+  const debouncedCityFilter = useCallback(
+    debounce((value: string) => {
+      setCityFilter(value);
+      setPage((prev) => ({ ...prev, current_page: 1 }));
+      getData(1, page.per_page, { stationCode: stationCodeFilter, city: value });
+    }, 300),
+    [stationCodeFilter, page.per_page]
+  );
+
+  const handleStationCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setStationCodeInput(value);
+    activeInputRef.current = "stationCode";
+    debouncedStationCodeFilter(value);
+  };
+
+  const handleCityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCityInput(value);
+    activeInputRef.current = "city";
+    debouncedCityFilter(value);
+  };
+
+  // Restore focus after re-render
+  useEffect(() => {
+    if (activeInputRef.current === "stationCode" && stationCodeInputRef.current) {
+      stationCodeInputRef.current.focus();
+      const length = stationCodeInputRef.current.value.length;
+      stationCodeInputRef.current.setSelectionRange(length, length);
+    } else if (activeInputRef.current === "city" && cityInputRef.current) {
+      cityInputRef.current.focus();
+      const length = cityInputRef.current.value.length;
+      cityInputRef.current.setSelectionRange(length, length);
+    }
+  }, [listData, page]);
+
+  useEffect(() => {
+    getData(page.current_page, page.per_page, { stationCode: stationCodeFilter, city: cityFilter });
+  }, [refresh]);
+
   const handlePageClick = (e: any) => {
     if (!loading) {
       const newPage = e.selected + 1;
       if (newPage !== page.current_page) {
         setPage((prev) => ({ ...prev, current_page: newPage }));
-        getData(newPage, page.per_page);
+        getData(newPage, page.per_page, { stationCode: stationCodeFilter, city: cityFilter });
       }
     }
   };
@@ -132,13 +202,9 @@ const Station: FC = () => {
     const newSize = parseInt(e.target.value, 10);
     if (newSize !== page.per_page) {
       setPage((prev) => ({ ...prev, per_page: newSize, current_page: 1 }));
-      getData(1, newSize);
+      getData(1, newSize, { stationCode: stationCodeFilter, city: cityFilter });
     }
   };
-
-  useEffect(() => {
-    getData(page.current_page, page.per_page);
-  }, [refresh]);
 
   return (
     <div className="overflow-x-auto">
@@ -150,15 +216,34 @@ const Station: FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center bg-white px-4 py-4 gap-4 sm:gap-0 sm:py-0 sm:h-16">
             <div className="w-full sm:w-auto">
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 w-full">
-                <div className="relative w-full">
-                  <div className="absolute inset-y-0 left-1 rtl:inset-r-0 rtl:right-0 flex items-center ps-3 pointer-events-none">
+                <div className="relative w-full sm:w-48">
+                  <div className="absolute inset-y-0 left-1 flex items-center ps-3 pointer-events-none">
                     <Search className="size-5 text-gray-400" />
                   </div>
                   <input
                     type="text"
-                    id="searchQuery"
+                    id="stationCodeFilter"
+                    ref={stationCodeInputRef}
                     className="w-full p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-3xl outline-none"
-                    placeholder="Search"
+                    placeholder="Station Code"
+                    value={stationCodeInput}
+                    onChange={handleStationCodeChange}
+                    onFocus={() => (activeInputRef.current = "stationCode")}
+                  />
+                </div>
+                <div className="relative w-full sm:w-48">
+                  <div className="absolute inset-y-0 left-1 flex items-center ps-3 pointer-events-none">
+                    <Search className="size-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    id="cityFilter"
+                    ref={cityInputRef}
+                    className="w-full p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-3xl outline-none"
+                    placeholder="Staion Name"
+                    value={cityInput}
+                    onChange={handleCityChange}
+                    onFocus={() => (activeInputRef.current = "city")}
                   />
                 </div>
                 <select
@@ -174,7 +259,6 @@ const Station: FC = () => {
             </div>
             <div className="w-full sm:w-auto">
               <div className="flex gap-2 flex-col lg:flex-row">
-                {" "}
                 <Button
                   onClick={handleOpenAddModal}
                   className="w-full sm:w-auto flex justify-center items-center gap-2 bg-[#303fe8] hover:bg-[#303fe8]/90 text-white"
@@ -357,7 +441,7 @@ const Station: FC = () => {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center mt-12">
-                <h2 className="text-xl font-semibold mb-4">No DATA Found</h2>
+                <h2 className="text-xl font-semibold mb-4">No Data Found</h2>
               </div>
             )}
           </div>

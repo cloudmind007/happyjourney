@@ -1,35 +1,36 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
-type AuthContextType = {
-  isAuthenticated: boolean;
-  token: string | null;
-  login: (token: string) => void;
+interface AuthContextType {
+  accessToken: string | null;
+  role: string | null;
+  login: (accessToken: string, role: string) => void;
   logout: () => void;
-};
+}
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem("admin_token");
-  });
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [accessToken, setAccessToken] = useState<string | null>(
+    localStorage.getItem("accessToken")
+  );
+  const [role, setRole] = useState<string | null>(localStorage.getItem("role"));
 
-  const isAuthenticated = !!token;
-
-  const login = (newToken: string) => {
-    localStorage.setItem("admin_token", newToken);
-    setToken(newToken);
+  const login = (newAccessToken: string, newRole: string) => {
+    setAccessToken(newAccessToken);
+    setRole(newRole);
+    localStorage.setItem("accessToken", newAccessToken);
+    localStorage.setItem("role", newRole);
   };
 
   const logout = () => {
-    localStorage.removeItem("admin_token");
-    setToken(null);
+    setAccessToken(null);
+    setRole(null);
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("role");
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, token, login, logout }}>
+    <AuthContext.Provider value={{ accessToken, role, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
