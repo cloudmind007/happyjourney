@@ -1,24 +1,11 @@
-import { useState } from "react";
 import {
-  LayoutDashboard,
-  Image,
-  FileText,
-  Package,
+
   UtensilsCrossed,
-  Users,
   ShoppingCart,
   CreditCard,
-  MapPin,
-  Award,
-  Star,
-  Palette,
-  Globe,
-  RefreshCw,
   DollarSign,
   TrendingUp,
   UserPlus,
-  Menu,
-  ChevronRight,
   Eye,
 } from "lucide-react";
 

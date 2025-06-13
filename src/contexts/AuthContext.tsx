@@ -5,8 +5,10 @@ type AuthContextType = {
   role: string | null;
   username: string | null;
   userId: number | null;
+  vendorId: number | null; // Added
   login: (data: { accessToken: string; role: string; username: string; userId: number }) => void;
   logout: () => void;
+  setVendorId: (vendorId: number | null) => void; // Added
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,33 +20,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [userId, setUserId] = useState<number | null>(
     localStorage.getItem("userId") ? Number(localStorage.getItem("userId")) : null
   );
+  const [vendorId, setVendorId] = useState<number | null>(
+    localStorage.getItem("vendorId") ? Number(localStorage.getItem("vendorId")) : null
+  ); // Added
 
   const login = (data: { accessToken: string; role: string; username: string; userId: number }) => {
-    console.log("Logging in with data:", data); // Debug
+    console.log("Logging in with data:", data);
     setAccessToken(data.accessToken);
-    setRole(data.role.toLowerCase()); // Normalize to lowercase
+    setRole(data.role.toLowerCase());
     setUsername(data.username);
     setUserId(data.userId);
     localStorage.setItem("accessToken", data.accessToken);
     localStorage.setItem("role", data.role.toLowerCase());
     localStorage.setItem("username", data.username);
     localStorage.setItem("userId", String(data.userId));
+    // Clear vendorId on login to ensure it's fetched fresh
+    setVendorId(null);
+    localStorage.removeItem("vendorId");
   };
 
   const logout = () => {
-    console.log("Logging out"); // Debug
+    console.log("Logging out");
     setAccessToken(null);
     setRole(null);
     setUsername(null);
     setUserId(null);
+    setVendorId(null); // Added
     localStorage.removeItem("accessToken");
     localStorage.removeItem("role");
     localStorage.removeItem("username");
     localStorage.removeItem("userId");
+    localStorage.removeItem("vendorId"); // Added
   };
 
   return (
-    <AuthContext.Provider value={{ accessToken, role, username, userId, login, logout }}>
+    <AuthContext.Provider value={{ accessToken, role, username, userId, vendorId, login, logout, setVendorId }}>
       {children}
     </AuthContext.Provider>
   );

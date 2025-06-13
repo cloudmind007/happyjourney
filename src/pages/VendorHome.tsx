@@ -10,8 +10,7 @@ interface VendorDetails {
 }
 
 const VendorHome: React.FC = () => {
-  const { userId } = useAuth();
-  const [vendorId, setVendorId] = useState<number | null>(null);
+  const { userId, vendorId, setVendorId } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,10 +21,18 @@ const VendorHome: React.FC = () => {
       return;
     }
 
+    if (vendorId) {
+      // Skip fetching if vendorId is already in context
+      setLoading(false);
+      return;
+    }
+
     const fetchVendorDetails = async () => {
       try {
         const response = await api.get<VendorDetails>(`/vendors/user-vendor/${userId}`);
-        setVendorId(response.data.vendorId);
+        const newVendorId = response.data.vendorId;
+        setVendorId(newVendorId); // Update context
+        localStorage.setItem("vendorId", String(newVendorId)); // Persist to localStorage
         setLoading(false);
       } catch (err) {
         console.error("Failed to fetch vendor details:", err);
@@ -35,7 +42,7 @@ const VendorHome: React.FC = () => {
     };
 
     fetchVendorDetails();
-  }, [userId]);
+  }, [userId, vendorId, setVendorId]);
 
   if (loading) return <div className="p-4 text-center">Loading...</div>;
   if (error) return <div className="p-4 text-center text-red-500">{error}</div>;
@@ -44,4 +51,4 @@ const VendorHome: React.FC = () => {
   return <RestaurantDetail vendorId={vendorId} isViewOnly={true} />;
 };
 
-export default VendorHome
+export default VendorHome;
