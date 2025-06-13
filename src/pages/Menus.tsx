@@ -7,6 +7,7 @@ import Pagination from "../components/Pagination";
 const Menus = () => {
   const [listData, setListData] = useState([]);
   const [loading, setLoading] = useState(false);
+ 
   const [page, setPage] = useState({
     current_page: 1,
     to: 0,

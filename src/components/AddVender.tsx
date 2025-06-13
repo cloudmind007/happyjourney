@@ -104,7 +104,7 @@ export default function AddVendor({
   mode,
   setRefresh,
   refresh,
-}: IndiProps) {
+}: IndiProps) {``
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrlPreview, setlogoUrlPreview] = useState<string | null>(null);
   const [stationsList, setStationsList] = useState<Station[]>([]);
@@ -262,7 +262,7 @@ export default function AddVendor({
   ) => {
     onChange(Number(event.target.value));
   };
-
+  
   return (
     <Modal
       open={open}

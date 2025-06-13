@@ -222,7 +222,7 @@ const Restaurant: FC = () => {
                               1}
                           </td>
                           <td className="px-2 py-4 font-medium text-black">
-                            {item.img_path ? (
+                            {item.logoUrl ? (
                               <img
                                 src={`${item.logoUrl}`}
                                 className="max-w-20 max-h-20 mx-auto"
@@ -259,10 +259,15 @@ const Restaurant: FC = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => {
-                                  // handleOpenEditModal(item.stationId)
-                                  navigate(`/vender-detail/${item.vendorId}`);
-                                }}
+                                onClick={() => handleOpenEditModal(item.vendorId)}
+                                className="p-2.5"
+                              >
+                                <Edit className="w-5 h-5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate(`/vender-detail/${item.vendorId}`)}
                                 className="p-2.5"
                               >
                                 <Eye className="w-5 h-5" />
@@ -304,9 +309,7 @@ const Restaurant: FC = () => {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() =>
-                                handleOpenEditModal(item.stationId)
-                              }
+                              onClick={() => handleOpenEditModal(item.vendorId)}
                               className="p-2"
                             >
                               <Edit className="w-5 h-5" />
@@ -314,8 +317,16 @@ const Restaurant: FC = () => {
                             <Button
                               size="sm"
                               variant="outline"
+                              onClick={() => navigate(`/vender-detail/${item.vendorId}`)}
+                              className="p-2"
+                            >
+                              <Eye className="w-5 h-5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
                               onClick={() => {
-                                setSelectedId(item.stationId);
+                                setSelectedId(item.vendorId);
                                 setOpen(true);
                               }}
                               className="p-2 text-red-600 hover:text-red-800"
@@ -325,7 +336,7 @@ const Restaurant: FC = () => {
                           </div>
                         </div>
                         <div className="flex flex-col gap-2">
-                          {item.img_path && (
+                          {item.logoUrl && (
                             <img
                               src={`${item.logoUrl}`}
                               className="max-w-24 max-h-24 mx-auto"
@@ -359,7 +370,7 @@ const Restaurant: FC = () => {
                                 item.activeStatus
                                   ? "text-blue-600 bg-blue-100"
                                   : "text-white bg-yellow-600"
-                              }`}
+                                }`}
                             >
                               {item.activeStatus ? "Active" : "notActive"}
                             </span>
@@ -370,7 +381,6 @@ const Restaurant: FC = () => {
                   ))}
                 </div>
 
-                {/* Pagination */}
                 <div className="w-full mt-4">
                   <Pagination
                     numOfPages={page.last_page}
@@ -422,16 +432,15 @@ const Restaurant: FC = () => {
               Yes, Delete
             </Button>
             <Button
-              className="bg-gray-600 w-full sm:w-auto px-4 py-2"
+              className="w-full sm:w-auto px-4 py-2 bg-gray-600"
               onClick={handleClose}
             >
               No
             </Button>
-          </Box>
+          </Box>F
         </Box>
       </Modal>
 
-      {/* Add/Edit Vendor Modal */}
       <AddVendorModal
         open={openModal}
         setOpen={setOpenModal}
