@@ -14,7 +14,9 @@ interface Station {
 
 interface Category {
   categoryId: number;
-  name: string;
+  vendorId: number;
+  categoryName: string;
+  displayOrder: number;
 }
 
 interface Vendor {
@@ -60,7 +62,7 @@ const OrderFood = () => {
   const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
 
-  // Fetch image for vendor logo with better error handling
+  // Fetch image for vendor logo
   const fetchImage = async (logoUrl: string) => {
     if (!logoUrl || imageUrls[logoUrl]) return;
 
@@ -69,16 +71,12 @@ const OrderFood = () => {
         `/files/download?systemFileName=${logoUrl}`,
         { responseType: "blob" }
       );
-
       if (response.status === 200) {
         const blob = response.data;
         const url = URL.createObjectURL(blob);
         setImageUrls((prev) => ({ ...prev, [logoUrl]: url }));
-      } else {
-        throw new Error(`Failed to fetch image: ${response.status}`);
       }
     } catch (error) {
-      console.error(`Failed to fetch image for ${logoUrl}:`, error);
       setImageUrls((prev) => ({
         ...prev,
         [logoUrl]: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=150&auto=format&fit=crop",
@@ -86,11 +84,8 @@ const OrderFood = () => {
     }
   };
 
-  // Debounce function to delay API calls
-  const debounce = <F extends (...args: any[]) => void>(
-    func: F,
-    wait: number
-  ) => {
+  // Debounce function
+  const debounce = <F extends (...args: any[]) => void>(func: F, wait: number) => {
     let timeout: NodeJS.Timeout;
     return (...args: Parameters<F>) => {
       clearTimeout(timeout);
@@ -98,7 +93,7 @@ const OrderFood = () => {
     };
   };
 
-  // Fetch stations based on search query
+  // Fetch stations
   const fetchStations = useCallback(
     async (query: string, type: "stationCode" | "city") => {
       if (!query.trim()) {
@@ -116,13 +111,7 @@ const OrderFood = () => {
           if (res.data.length > 0) {
             setPage((prev) => ({ ...prev, current_page: 1 }));
             fetchVendors(res.data[0].stationId, 1, page.per_page);
-          } else {
-            setVendors([]);
           }
-        } else {
-          console.error("Unexpected station response:", res.data);
-          setStations([]);
-          setVendors([]);
         }
       } catch (err) {
         console.error("Error fetching stations", err);
@@ -135,7 +124,6 @@ const OrderFood = () => {
     [page.per_page]
   );
 
-  // Debounced version of fetchStations
   const debouncedFetchStations = useCallback(
     debounce((query: string, type: "stationCode" | "city") => {
       fetchStations(query, type);
@@ -143,7 +131,7 @@ const OrderFood = () => {
     [fetchStations]
   );
 
-  // Fetch vendors for a given station
+  // Fetch vendors with proper category handling
   const fetchVendors = async (stationId: number, pageNumber = 1, pageSize = 10) => {
     if (!stationId) return;
     setLoading(true);
@@ -157,18 +145,24 @@ const OrderFood = () => {
       }>(`/vendors/stations/${stationId}?page=${pageNumber - 1}&size=${pageSize}`);
 
       const vendorsData = res.data.content || [];
-      // Fetch images for logos
-      vendorsData.forEach((vendor) => {
-        if (vendor.logoUrl) {
-          fetchImage(vendor.logoUrl);
-        }
-      });
-      // Fetch categories for each vendor
-      const vendorsWithCategories = await Promise.all(
+      
+      // Fetch images and categories
+      const vendorsWithData = await Promise.all(
         vendorsData.map(async (vendor) => {
+          // Fetch logo
+          if (vendor.logoUrl) {
+            await fetchImage(vendor.logoUrl);
+          }
+          
+          // Fetch categories
           try {
-            const categoriesRes = await api.get<Category[]>(`/menu/vendors/${vendor.vendorId}/categories`);
-            return { ...vendor, categories: categoriesRes.data };
+            const categoriesRes = await api.get<{
+              content: Category[];
+            }>(`/menu/vendors/${vendor.vendorId}/categories`);
+            return { 
+              ...vendor, 
+              categories: categoriesRes.data.content || [] 
+            };
           } catch (error) {
             console.error(`Failed to fetch categories for vendor ${vendor.vendorId}:`, error);
             return { ...vendor, categories: [] };
@@ -176,7 +170,7 @@ const OrderFood = () => {
         })
       );
 
-      setVendors(vendorsWithCategories);
+      setVendors(vendorsWithData);
       const { pageable, numberOfElements, totalElements, totalPages } = res.data;
       setPage({
         current_page: pageNumber,
@@ -195,27 +189,23 @@ const OrderFood = () => {
     }
   };
 
-  // Handle search input change
+  // Event handlers
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
     debouncedFetchStations(query, searchType);
   };
 
-  // Handle pagination
   const handlePageClick = (e: { selected: number }) => {
     if (!loading) {
       const newPage = e.selected + 1;
-      if (newPage !== page.current_page) {
+      if (newPage !== page.current_page && stations.length > 0) {
         setPage((prev) => ({ ...prev, current_page: newPage }));
-        if (stations.length > 0) {
-          fetchVendors(stations[0].stationId, newPage, page.per_page);
-        }
+        fetchVendors(stations[0].stationId, newPage, page.per_page);
       }
     }
   };
 
-  // Handle page size change
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSize = parseInt(e.target.value, 10);
     setPage((prev) => ({ ...prev, per_page: newSize, current_page: 1 }));
@@ -224,33 +214,49 @@ const OrderFood = () => {
     }
   };
 
-  // Cleanup image URLs
+  // Cleanup
   useEffect(() => {
     return () => {
       Object.values(imageUrls).forEach((url) => {
-        if (!url.includes("unsplash.com") && !url.includes("via.placeholder.com")) {
+        if (!url.includes("unsplash.com")) {
           URL.revokeObjectURL(url);
         }
       });
     };
   }, [imageUrls]);
 
+  // Render star rating
+  // Render star rating with half-star support
+const renderStarRating = (rating: number) => {
+  const fullStars = Math.floor(rating);
+  const hasHalfStar = rating % 1 >= 0.5;
+  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+  return (
+    <div className="flex items-center">
+      {[...Array(fullStars)].map((_, i) => (
+        <Star key={`full-${i}`} className="w-3 h-3 fill-yellow-500 text-yellow-500" />
+      ))}
+      {hasHalfStar && (
+        <div className="relative w-3 h-3">
+          <Star className="absolute w-3 h-3 fill-gray-300 text-gray-300" />
+          <Star className="absolute w-3 h-3 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />
+        </div>
+      )}
+      {[...Array(emptyStars)].map((_, i) => (
+        <Star key={`empty-${i}`} className="w-3 h-3 fill-gray-300 text-gray-300" />
+      ))}
+    </div>
+  );
+};
+
   return (
     <div className="flex min-h-screen bg-gray-50">
-      {/* Main Content */}
       <div className="flex-1 p-4 md:p-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">Order Food</h1>
           <div className="flex items-center gap-2">
-            <button className="md:hidden">
-              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
-              </svg>
-            </button>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Order Food</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Hi, undefined</span>
             <div className="w-8 h-8 bg-purple-600 text-white flex items-center justify-center rounded-full">U</div>
           </div>
         </div>
@@ -261,20 +267,16 @@ const OrderFood = () => {
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => setSearchType("stationCode")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  searchType === "stationCode"
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                className={`px-4 py-2 rounded-full text-sm font-medium ${
+                  searchType === "stationCode" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"
                 }`}
               >
                 Station Code
               </Button>
               <Button
                 onClick={() => setSearchType("city")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  searchType === "city"
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                className={`px-4 py-2 rounded-full text-sm font-medium ${
+                  searchType === "city" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"
                 }`}
               >
                 City
@@ -316,18 +318,15 @@ const OrderFood = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vendors.map((vendor, index) => (
+              {vendors.map((vendor) => (
                 <div
-                  key={vendor.vendorId || index}
+                  key={vendor.vendorId}
                   className={`bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer border border-gray-100 ${
-                    vendor.veg
-                      ? "shadow-[0_0_0_2px_rgba(34,197,94,0.3)]"
-                      : "shadow-[0_0_0_2px_rgba(248,113,113,0.3)]"
+                    vendor.veg ? "border-b-2 border-b-green-500" : "border-b-2 border-b-red-500"
                   }`}
                   onClick={() => navigate(`/vendor-detail/${vendor.vendorId}`)}
                 >
                   <div className="flex flex-col sm:flex-row">
-                    {/* Left: Image */}
                     <div className="relative w-full sm:w-1/3 h-32 sm:h-auto">
                       {vendor.logoUrl && imageUrls[vendor.logoUrl] ? (
                         <img
@@ -340,66 +339,47 @@ const OrderFood = () => {
                           No Image
                         </div>
                       )}
-                      <div className="absolute top-2 left-2 flex items-center gap-1 bg-white bg-opacity-90 px-2 py-1 rounded-full">
-                        {vendor.veg ? (
-                          <Sprout className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <Drumstick className="w-4 h-4 text-red-500" />
-                        )}
-                        <span className="text-xs font-medium text-gray-800">
-                          {vendor.veg ? "Veg" : "Non-Veg"}
-                        </span>
-                      </div>
                     </div>
-                    {/* Right: Content */}
                     <div className="w-full sm:w-2/3 p-3 flex flex-col justify-between">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-1 line-clamp-1">
-                          {vendor.businessName || "-"}
-                        </h3>
+                        <div className="flex justify-between items-start mb-1">
+                          <h3 className="text-lg font-semibold text-gray-800 line-clamp-1">
+                            {vendor.businessName}
+                          </h3>
+                          <div className="flex items-center gap-1 bg-white px-1 py-0.5 rounded">
+                            {vendor.veg ? (
+                              <Sprout className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Drumstick className="w-4 h-4 text-red-500" />
+                            )}
+                            <span className="text-xs font-medium text-gray-800">
+                              {vendor.veg ? "Veg" : "Non-Veg"}
+                            </span>
+                          </div>
+                        </div>
                         <p className="text-xs text-gray-600 line-clamp-1 mb-2">
-                          {vendor.description || "-"}
+                          {vendor.description}
                         </p>
                         <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-600">
                           <div>
-                            <span className="font-medium">FSSAI:</span>{" "}
-                            {vendor.fssaiLicense || "-"}
+                            <span className="font-medium">FSSAI:</span> {vendor.fssaiLicense}
+                          </div>
+                          <div className="flex items-center gap-1">
+  <span className="font-medium">Rating:</span>
+  {renderStarRating(vendor.rating || 0)}
+</div>
+                          <div>
+                            <Clock className="w-3 h-3 text-gray-500 inline mr-1" />
+                            {vendor.preparationTimeMin || 0} min
                           </div>
                           <div>
-                            <span className="font-medium">Rating:</span>{" "}
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3 text-yellow-500" />
-                              {(vendor.rating || 0).toFixed(1)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="font-medium">Prep Time:</span>{" "}
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-gray-500" />
-                              {vendor.preparationTimeMin || 0} min
-                            </span>
-                          </div>
-                          <div>
-                            <span className="font-medium">Min Order:</span>{" "}
-                            ₹{vendor.minOrderAmount || 0}
-                          </div>
-                          <div>
-                            <span className="font-medium">Status:</span>{" "}
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                vendor.activeStatus
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-red-100 text-red-500"
-                              }`}
-                            >
-                              {vendor.activeStatus ? "Active" : "Inactive"}
-                            </span>
+                            <span className="font-medium">Min Order:</span> ₹{vendor.minOrderAmount || 0}
                           </div>
                           <div className="col-span-2">
                             <span className="font-medium">Cuisines:</span>{" "}
-                            {vendor.categories && vendor.categories.length > 0
-                              ? vendor.categories.map((c) => c.name).join(", ")
-                              : "No cuisines available"}
+                            {vendor.categories?.length ? 
+                              vendor.categories.map(c => c.categoryName).join(", ") : 
+                              "No cuisines available"}
                           </div>
                         </div>
                       </div>
@@ -428,9 +408,6 @@ const OrderFood = () => {
                 from={page.from}
                 to={page.to}
               />
-              <p className="text-sm text-gray-600">
-                Showing {page.from} to {page.to} of {page.total} results
-              </p>
             </div>
           </div>
         )}
