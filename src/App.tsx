@@ -47,9 +47,10 @@ const App = () => {
           </Route>
 
           <Route element={<PrivateRoute allowedRoles={["user"]} />}>
-            <Route path="/home" element={<Home />} />
-            <Route path="/orders" element={<OrderFood />} />
-            <Route path="/user/orders" element={<UserOrders />} />
+            <Route path="/home" element={<OrderFood  />} />
+            <Route path="/cart" element={<OrderFood />} />
+            {/* <Route path="/cart" element={<OrderFood />} />
+            <Route path="/cart" element={<OrderFood />} />             */}
           </Route>
 
           <Route

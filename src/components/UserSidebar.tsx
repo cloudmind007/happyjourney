@@ -31,7 +31,7 @@ const UserSidebar: React.FC<UserSidebarProps> = ({ collapsed, setCollapsed }) =>
       className={`h-full ${collapsed ? "w-20" : "w-64"} bg-white shadow-sm border-r transition-all duration-300`}
     >
       <div className="flex items-center justify-between p-4">
-        {!collapsed && <h1 className="text-xl font-bold text-gray-800">User Portal</h1>}
+        {!collapsed && <h1 className="text-xl font-bold text-gray-800">RelSwad</h1>}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="p-2 rounded hover:bg-gray-100 transition"

@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import api from "../utils/axios";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -18,53 +19,54 @@ const Login: React.FC = () => {
     formState: { errors },
     setError,
   } = useForm<LoginFormInputs>();
-// Update the onSubmit function in Login.tsx
-const onSubmit = async (data: LoginFormInputs) => {
-  try {
-    const { email, password } = data;
-    const response = await api.post("/auth/login", {
-      identifier: email,
-      password,
-    });
+  const [showPassword, setShowPassword] = useState(false);
 
-    if (response.status === 200 && response.data.accessToken) {
-      const { accessToken, role, name: username, userId } = response.data;
-      login({ 
-        accessToken, 
-        role, 
-        username, 
-        userId 
+  const onSubmit = async (data: LoginFormInputs) => {
+    try {
+      const { email, password } = data;
+      const response = await api.post("/auth/login", {
+        identifier: email,
+        password,
       });
 
-      // Redirect based on role (case-insensitive)
-      const normalizedRole = role.toLowerCase();
-      switch (normalizedRole) {
-        case "admin":
-          navigate("/dashboard");
-          break;
-        case "user":
-          navigate("/home");
-          break;
-        case "vendor":
-          navigate("/vendor/home");
-          break;
-        default:
-          throw new Error("Unknown role");
+      if (response.status === 200 && response.data.accessToken) {
+        const { accessToken, role, name: username, userId } = response.data;
+        login({
+          accessToken,
+          role,
+          username,
+          userId,
+        });
+
+        // Redirect based on role (case-insensitive)
+        const normalizedRole = role.toLowerCase();
+        switch (normalizedRole) {
+          case "admin":
+            navigate("/dashboard");
+            break;
+          case "user":
+            navigate("/home");
+            break;
+          case "vendor":
+            navigate("/vendor/home");
+            break;
+          default:
+            throw new Error("Unknown role");
+        }
+      } else {
+        throw new Error("Invalid response");
       }
-    } else {
-      throw new Error("Invalid response");
+    } catch (error) {
+      setError("email", {
+        type: "manual",
+        message: "Invalid email or password",
+      });
+      setError("password", {
+        type: "manual",
+        message: "Invalid email or password",
+      });
     }
-  } catch (error) {
-    setError("email", {
-      type: "manual",
-      message: "Invalid email or password",
-    });
-    setError("password", {
-      type: "manual",
-      message: "Invalid email or password",
-    });
-  }
-};
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
@@ -110,17 +112,30 @@ const onSubmit = async (data: LoginFormInputs) => {
             >
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              {...register("password", {
-                required: "Password is required",
-              })}
-              className={`w-full px-4 py-2 border ${
-                errors.password ? "border-red-500" : "border-gray-300"
-              } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                {...register("password", {
+                  required: "Password is required",
+                })}
+                className={`w-full px-4 py-2 border ${
+                  errors.password ? "border-red-500" : "border-gray-300"
+                } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+              >
+                {showPassword ? (
+                  <AiOutlineEyeInvisible className="h-5 w-5" />
+                ) : (
+                  <AiOutlineEye className="h-5 w-5" />
+                )}
+              </button>
+            </div>
             {errors.password && (
               <p className="text-sm text-red-500 mt-1">
                 {errors.password.message}

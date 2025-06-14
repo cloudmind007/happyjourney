@@ -7,7 +7,7 @@ import api from "../utils/axios";
 type RegisterFormInputs = {
   email: string;
   username: string;
-  phoneNumber: string;
+  phoneNumber: string; // This will store only the 10 digits
   password: string;
 };
 
@@ -20,43 +20,44 @@ const UserRegister: React.FC = () => {
     setError,
     watch,
     setValue,
+    clearErrors,
   } = useForm<RegisterFormInputs>();
   const [showPassword, setShowPassword] = useState(false);
-  const [phoneError, setPhoneError] = useState<string | null>(null);
-  const [phoneValue, setPhoneValue] = useState("");
+  const [displayPhoneValue, setDisplayPhoneValue] = useState(""); // Only for display
 
   const email = watch("email");
+  const phoneNumber = watch("phoneNumber");
 
   const validateEmailOrPhone = () => {
-    if (!email && !phoneValue) {
+    if (!email && !phoneNumber) {
       return "Either email or phone number is required";
     }
     return true;
   };
 
   const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (/^[0-9]*$/.test(value)) {
-      setPhoneValue(value);
-      setValue("phoneNumber", value ? "+91" + value : ""); // Sync with react-hook-form
-      setPhoneError(null);
-    } else {
-      setPhoneError("Only digits are allowed");
-      // Remove non-numeric characters
-      const sanitizedValue = value.replace(/[^0-9]/g, "");
-      setPhoneValue(sanitizedValue);
-      setValue("phoneNumber", sanitizedValue ? "+91" + sanitizedValue : "");
+    const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+    setDisplayPhoneValue(value);
+    setValue("phoneNumber", value, { shouldValidate: true });
+
+    // Clear phone number errors when valid
+    if (value.length === 10) {
+      clearErrors("phoneNumber");
     }
   };
 
   const onSubmit = async (data: RegisterFormInputs) => {
     try {
-      const res = await api.post("/auth/register", { ...data, role: "ROLE_USER" });
+      const res = await api.post("/auth/register", { 
+        ...data, 
+        phoneNumber: data.phoneNumber, // Just the 10 digits
+        role: "ROLE_USER" 
+      });
 
       if (res.status === 200) {
         navigate("/verify-otp", {
           state: {
-            email: data.email || data.phoneNumber,
+            email: data.email || "+91" + data.phoneNumber,
             message: "OTP sent successfully",
           },
         });
@@ -75,7 +76,7 @@ const UserRegister: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="w-full max-w-md bg-white rounded-xl shadow-md p-8">
         <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">
-          Register as User
+          Sign Up
         </h2>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -103,7 +104,7 @@ const UserRegister: React.FC = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number
+              Mobile
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
@@ -111,24 +112,26 @@ const UserRegister: React.FC = () => {
               </span>
               <input
                 type="tel"
-                value={phoneValue}
+                value={displayPhoneValue}
                 {...register("phoneNumber", {
-                  validate: validateEmailOrPhone,
-                  pattern: {
-                    value: /^\+91[0-9]{10}$/,
-                    message: "Phone number must be exactly 10 digits after +91",
-                  },
+                  validate: {
+                    required: (value) => {
+                      if (!email && !value) return "Either email or phone is required";
+                      return true;
+                    },
+                    length: (value) => {
+                      if (value && value.length !== 10) return "Phone number must be exactly 10 digits";
+                      return true;
+                    }
+                  }
                 })}
                 onChange={handlePhoneInput}
                 className={`w-full pl-12 pr-4 py-2 border ${
-                  errors.phoneNumber || phoneError ? "border-red-500" : "border-gray-300"
+                  errors.phoneNumber ? "border-red-500" : "border-gray-300"
                 } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
             </div>
-            {phoneError && (
-              <p className="text-sm text-red-500 mt-1">{phoneError}</p>
-            )}
-            {errors.phoneNumber && !phoneError && (
+            {errors.phoneNumber && (
               <p className="text-sm text-red-500 mt-1">{errors.phoneNumber.message}</p>
             )}
           </div>
@@ -187,7 +190,7 @@ const UserRegister: React.FC = () => {
         </form>
 
         <p className="mt-4 text-sm text-gray-500 text-center">
-          Already have an account?
+          Already have an account?{" "}
           <a href="/login" className="text-blue-600 hover:underline">
             Log in
           </a>
