@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import { Search, Star, Clock, Sprout, Drumstick, Circle, Square } from "lucide-react";
+import { Search, Star, Clock } from "lucide-react";
 import api from "@/utils/axios";
 import Pagination from "@/components/Pagination";
 import WhyChooseRelswad from "./WhyChooseRelswad";
