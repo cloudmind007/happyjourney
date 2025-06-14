@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Search, Star, Clock, Sprout, Drumstick } from "lucide-react";
 import api from "@/utils/axios";
 import Pagination from "@/components/Pagination";
@@ -30,6 +29,7 @@ interface Vendor {
   rating: number;
   address: string;
   categories?: Category[];
+  minOrderAmount?: number;
 }
 
 interface PaginationData {
@@ -57,7 +57,34 @@ const OrderFood = () => {
     remainingPages: 0,
     last_page: 0,
   });
+  const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
+
+  // Fetch image for vendor logo with better error handling
+  const fetchImage = async (logoUrl: string) => {
+    if (!logoUrl || imageUrls[logoUrl]) return;
+
+    try {
+      const response = await api.get(
+        `/files/download?systemFileName=${logoUrl}`,
+        { responseType: "blob" }
+      );
+
+      if (response.status === 200) {
+        const blob = response.data;
+        const url = URL.createObjectURL(blob);
+        setImageUrls((prev) => ({ ...prev, [logoUrl]: url }));
+      } else {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
+    } catch (error) {
+      console.error(`Failed to fetch image for ${logoUrl}:`, error);
+      setImageUrls((prev) => ({
+        ...prev,
+        [logoUrl]: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=150&auto=format&fit=crop",
+      }));
+    }
+  };
 
   // Debounce function to delay API calls
   const debounce = <F extends (...args: any[]) => void>(
@@ -72,39 +99,41 @@ const OrderFood = () => {
   };
 
   // Fetch stations based on search query
-  const fetchStations = useCallback(async (query: string, type: "stationCode" | "city") => {
-    if (!query.trim()) {
-      setStations([]);
-      setVendors([]);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const params = type === "stationCode" ? { stationCode: query } : { city: query };
-      const res = await api.get<Station[]>("/stations/all", { params });
-      if (Array.isArray(res.data)) {
-        setStations(res.data);
-        // If stations are found, fetch vendors for the first station
-        if (res.data.length > 0) {
-          setPage((prev) => ({ ...prev, current_page: 1 }));
-          fetchVendors(res.data[0].stationId, 1, page.per_page);
-        } else {
-          setVendors([]);
-        }
-      } else {
-        console.error("Unexpected station response:", res.data);
+  const fetchStations = useCallback(
+    async (query: string, type: "stationCode" | "city") => {
+      if (!query.trim()) {
         setStations([]);
         setVendors([]);
+        return;
       }
-    } catch (err) {
-      console.error("Error fetching stations", err);
-      setStations([]);
-      setVendors([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [page.per_page]);
+
+      setLoading(true);
+      try {
+        const params = type === "stationCode" ? { stationCode: query } : { city: query };
+        const res = await api.get<Station[]>("/stations/all", { params });
+        if (Array.isArray(res.data)) {
+          setStations(res.data);
+          if (res.data.length > 0) {
+            setPage((prev) => ({ ...prev, current_page: 1 }));
+            fetchVendors(res.data[0].stationId, 1, page.per_page);
+          } else {
+            setVendors([]);
+          }
+        } else {
+          console.error("Unexpected station response:", res.data);
+          setStations([]);
+          setVendors([]);
+        }
+      } catch (err) {
+        console.error("Error fetching stations", err);
+        setStations([]);
+        setVendors([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page.per_page]
+  );
 
   // Debounced version of fetchStations
   const debouncedFetchStations = useCallback(
@@ -126,8 +155,14 @@ const OrderFood = () => {
         totalElements: number;
         totalPages: number;
       }>(`/vendors/stations/${stationId}?page=${pageNumber - 1}&size=${pageSize}`);
-      
+
       const vendorsData = res.data.content || [];
+      // Fetch images for logos
+      vendorsData.forEach((vendor) => {
+        if (vendor.logoUrl) {
+          fetchImage(vendor.logoUrl);
+        }
+      });
       // Fetch categories for each vendor
       const vendorsWithCategories = await Promise.all(
         vendorsData.map(async (vendor) => {
@@ -189,8 +224,19 @@ const OrderFood = () => {
     }
   };
 
+  // Cleanup image URLs
+  useEffect(() => {
+    return () => {
+      Object.values(imageUrls).forEach((url) => {
+        if (!url.includes("unsplash.com") && !url.includes("via.placeholder.com")) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, [imageUrls]);
+
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-gray-50">
       {/* Main Content */}
       <div className="flex-1 p-4 md:p-6">
         {/* Header */}
@@ -201,7 +247,7 @@ const OrderFood = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
               </svg>
             </button>
-            <h1 className="text-xl md:text-2xl font-semibold text-gray-800">Orders</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Order Food</h1>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">Hi, undefined</span>
@@ -215,13 +261,21 @@ const OrderFood = () => {
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => setSearchType("stationCode")}
-                className={`px-4 py-2 rounded-full text-sm ${searchType === "stationCode" ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  searchType === "stationCode"
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
               >
                 Station Code
               </Button>
               <Button
                 onClick={() => setSearchType("city")}
-                className={`px-4 py-2 rounded-full text-sm ${searchType === "city" ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  searchType === "city"
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
               >
                 City
               </Button>
@@ -232,7 +286,7 @@ const OrderFood = () => {
                 value={searchQuery}
                 onChange={handleSearchInputChange}
                 placeholder={`Enter ${searchType === "stationCode" ? "Station Code" : "City"}`}
-                className="w-full pl-10 py-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 py-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
               />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-5 text-gray-400" />
             </div>
@@ -253,7 +307,7 @@ const OrderFood = () => {
               <select
                 value={page.per_page}
                 onChange={handlePageSizeChange}
-                className="border border-gray-300 rounded-full px-3 py-1 text-sm text-gray-600"
+                className="border border-gray-300 rounded-full px-3 py-1 text-sm text-gray-600 shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
                 <option value={10}>10 Records</option>
                 <option value={25}>25 Records</option>
@@ -262,59 +316,109 @@ const OrderFood = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vendors.map((vendor: Vendor) => (
-                <Card
-                  key={vendor.vendorId}
-                  className="shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer"
+              {vendors.map((vendor, index) => (
+                <div
+                  key={vendor.vendorId || index}
+                  className={`bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer border border-gray-100 ${
+                    vendor.veg
+                      ? "shadow-[0_0_0_2px_rgba(34,197,94,0.3)]"
+                      : "shadow-[0_0_0_2px_rgba(248,113,113,0.3)]"
+                  }`}
                   onClick={() => navigate(`/vendor-detail/${vendor.vendorId}`)}
                 >
-                  <CardContent className="p-4 flex items-start gap-3">
-                    {vendor.logoUrl ? (
-                      <img
-                        src={vendor.logoUrl}
-                        alt="Vendor Logo"
-                        className="w-16 h-16 object-cover rounded-full border border-gray-200"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-                        <span className="text-gray-500 text-xs">Logo</span>
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-800">{vendor.businessName}</h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {vendor.categories && vendor.categories.length > 0
-                          ? `Cuisines: ${vendor.categories.map(c => c.name).join(", ")}`
-                          : "No cuisines available"}
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-2 text-sm text-gray-600">
-                        <span className="flex items-center gap-1">
-                          {vendor.veg ? (
-                            <Sprout className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Drumstick className="w-4 h-4 text-red-600" />
-                          )}
+                  <div className="flex flex-col sm:flex-row">
+                    {/* Left: Image */}
+                    <div className="relative w-full sm:w-1/3 h-32 sm:h-auto">
+                      {vendor.logoUrl && imageUrls[vendor.logoUrl] ? (
+                        <img
+                          src={imageUrls[vendor.logoUrl]}
+                          className="w-full h-full object-cover"
+                          alt="Vendor Logo"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
+                          No Image
+                        </div>
+                      )}
+                      <div className="absolute top-2 left-2 flex items-center gap-1 bg-white bg-opacity-90 px-2 py-1 rounded-full">
+                        {vendor.veg ? (
+                          <Sprout className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <Drumstick className="w-4 h-4 text-red-500" />
+                        )}
+                        <span className="text-xs font-medium text-gray-800">
                           {vendor.veg ? "Veg" : "Non-Veg"}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-4 h-4 text-gray-500" />
-                          Prep: {vendor.preparationTimeMin} min
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500" />
-                          {vendor.rating.toFixed(1)}
                         </span>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                    {/* Right: Content */}
+                    <div className="w-full sm:w-2/3 p-3 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-1 line-clamp-1">
+                          {vendor.businessName || "-"}
+                        </h3>
+                        <p className="text-xs text-gray-600 line-clamp-1 mb-2">
+                          {vendor.description || "-"}
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-600">
+                          <div>
+                            <span className="font-medium">FSSAI:</span>{" "}
+                            {vendor.fssaiLicense || "-"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Rating:</span>{" "}
+                            <span className="flex items-center gap-1">
+                              <Star className="w-3 h-3 text-yellow-500" />
+                              {(vendor.rating || 0).toFixed(1)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Prep Time:</span>{" "}
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-gray-500" />
+                              {vendor.preparationTimeMin || 0} min
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Min Order:</span>{" "}
+                            ₹{vendor.minOrderAmount || 0}
+                          </div>
+                          <div>
+                            <span className="font-medium">Status:</span>{" "}
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                vendor.activeStatus
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-500"
+                              }`}
+                            >
+                              {vendor.activeStatus ? "Active" : "Inactive"}
+                            </span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="font-medium">Cuisines:</span>{" "}
+                            {vendor.categories && vendor.categories.length > 0
+                              ? vendor.categories.map((c) => c.name).join(", ")
+                              : "No cuisines available"}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-1 text-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/vendor-detail/${vendor.vendorId}`);
+                        }}
+                      >
+                        View Menu
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
 
-            <div className="w-full mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-              <p className="text-sm text-gray-600">
-                Showing {page.from} to {page.to} of {page.total} results
-              </p>
+            <div className="w-full mt-6 flex flex-col items-center gap-4">
               <Pagination
                 numOfPages={page.last_page}
                 pageNo={page.current_page}
@@ -324,6 +428,9 @@ const OrderFood = () => {
                 from={page.from}
                 to={page.to}
               />
+              <p className="text-sm text-gray-600">
+                Showing {page.from} to {page.to} of {page.total} results
+              </p>
             </div>
           </div>
         )}

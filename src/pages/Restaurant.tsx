@@ -1,7 +1,7 @@
 import { FC, useEffect, useState } from "react";
 import api from "../utils/axios";
 import LoaderModal from "../components/LoaderModal";
-import { Edit, Eye, Plus, Search, Trash2, X } from "lucide-react";
+import { Edit, Eye, Plus, Search, Trash2, X, Leaf, Flame } from "lucide-react";
 import Pagination from "../components/Pagination";
 import { Button } from "@/components/ui/button";
 import { Box, Modal, Typography, IconButton } from "@mui/material";
@@ -23,7 +23,7 @@ const style = {
 };
 
 const Restaurant: FC = () => {
-  const [listData, setListData] = useState([]);
+  const [listData, setListData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -64,16 +64,16 @@ const Restaurant: FC = () => {
     try {
       setLoading(true);
       const res = await api.delete(`/vendors/${selectedId}`);
-      if (res.status === 204) { // Changed from 200 to 204
-        setRefresh(!refresh); // Trigger list refresh
-        handleClose(); // Close the modal
-        alert("Vendor deleted successfully!"); // Replace with toast notification if available
+      if (res.status === 204) {
+        setRefresh(!refresh);
+        handleClose();
+        alert("Vendor deleted successfully!");
       } else {
         throw new Error(`Unexpected status code: ${res.status}`);
       }
     } catch (error) {
       console.error("Failed to delete vendor:", error);
-      alert("Failed to delete vendor. Please try again."); // Replace with toast notification
+      alert("Failed to delete vendor. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -82,10 +82,9 @@ const Restaurant: FC = () => {
   const fetchImage = async (logoUrl: string) => {
     if (!logoUrl || imageUrls[logoUrl]) return;
 
-    const systemFileName = logoUrl;
     try {
       const response = await api.get(
-        `/files/download?systemFileName=${systemFileName}`,
+        `/files/download?systemFileName=${logoUrl}`,
         { responseType: "blob" }
       );
 
@@ -95,7 +94,7 @@ const Restaurant: FC = () => {
         setImageUrls((prev) => ({ ...prev, [logoUrl]: url }));
       }
     } catch (error) {
-      console.error(`Failed to fetch image for ${systemFileName}:`, error);
+      console.error(`Failed to fetch image for ${logoUrl}:`, error);
       setImageUrls((prev) => ({
         ...prev,
         [logoUrl]: "https://via.placeholder.com/80?text=No+Image",
@@ -149,7 +148,7 @@ const Restaurant: FC = () => {
     } catch (error) {
       console.error("Failed to fetch data:", error);
       setListData([]);
-      alert("Failed to fetch vendor data. Please try again."); // Replace with toast
+      alert("Failed to fetch vendor data. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -168,16 +167,15 @@ const Restaurant: FC = () => {
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSize = parseInt(e.target.value, 10);
     if (newSize !== page.per_page) {
-      setPage((prev) => ({ ...prev, per_page: newSize, current_page: 1 }));
+      setPage((prev) => ({ ...prev, per_page: NewSize, current_page: 1 }));
       getData(1, newSize);
     }
   };
 
   useEffect(() => {
     getData(page.current_page, page.per_page);
-  }, [refresh, page.current_page, page.per_page]); // Added page dependencies
+  }, [refresh, page.current_page, page.per_page]);
 
-  // Clean up object URLs on component unmount
   useEffect(() => {
     return () => {
       Object.values(imageUrls).forEach((url) => {
@@ -189,128 +187,124 @@ const Restaurant: FC = () => {
   }, [imageUrls]);
 
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full bg-gray-100">
       {loading ? (
         <LoaderModal />
       ) : (
         <div className="h-full w-full">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white px-4 py-4 gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white px-4 py-4 gap-4 shadow-sm">
             <div className="w-full sm:w-auto">
               <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative w-full sm:w-auto">
+                <div className="relative w-full sm:w-80">
                   <div className="absolute inset-y-0 left-1 flex items-center ps-3 pointer-events-none">
                     <Search className="size-5 text-gray-400" />
                   </div>
                   <input
                     type="text"
                     id="searchQuery"
-                    className="w-full sm:max-w-md p-2.5 ps-10 text-sm text-gray-900 border border-gray-300 rounded-3xl outline-none"
-                    placeholder="Search"
+                    className="w-full p-2.5 ps-10 text-sm text-gray-900 border border-gray-300 rounded-full outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Search vendors..."
                   />
                 </div>
                 <select
                   value={page.per_page}
                   onChange={handlePageSizeChange}
-                  className="border border-gray-300 rounded-lg px-3 py-2 w-full sm:w-auto"
+                  className="border border-gray-300 rounded-lg px-3 py-2 w-full sm:w-40 text-sm focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value={10}>10 Records Per Page</option>
-                  <option value={25}>25 Records Per Page</option>
-                  <option value={50}>50 Records Per Page</option>
+                  <option value={10}>10 Records</option>
+                  <option value={25}>25 Records</option>
+                  <option value={50}>50 Records</option>
                 </select>
               </div>
             </div>
-            <div className="w-full sm:w-auto">
-              <div
-                onClick={handleOpenAddModal}
-                className="flex justify-center items-center py-2 px-4 gap-2 bg-[#303fe8] text-white rounded-lg font-light shadow-lg cursor-pointer w-full sm:w-auto"
-              >
-                <Plus className="size-5" />
-                Add
-              </div>
-            </div>
+            <Button
+              onClick={handleOpenAddModal}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 w-full sm:w-auto shadow-md"
+            >
+              <Plus className="size-5" />
+              Add Vendor
+            </Button>
           </div>
 
-          <div className="bg-gray-50 p-3">
+          <div className="p-4">
             {listData.length > 0 ? (
-              <div className="p-4 bg-white">
-                <div className="hidden sm:block overflow-x-auto">
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="min-w-full border-separate border-spacing-y-2">
-                    <thead>
-                      <tr className="text-center">
-                        <th className="px-2 py-3 text-sm font-medium text-black">
-                          Sr. No.
-                        </th>
-                        <th className="px-2 py-3 text-sm font-medium text-black">
-                          Logo
-                        </th>
-                        <th className="px-2 py-3 text-sm font-medium text-black">
-                          Business Name
-                        </th>
-                        <th className="px-2 py-3 text-sm font-medium text-black">
-                          Description
-                        </th>
-                        <th className="px-2 py-3 text-sm font-medium text-black">
-                          Fssai License
-                        </th>
-                        <th className="px-2 py-3 text-sm font-medium text-black">
-                          Status
-                        </th>
-                        <th className="px-2 py-3 text-sm font-medium text-black">
-                          Action
-                        </th>
+                    <thead className="bg-gray-50">
+                      <tr className="text-center text-sm font-semibold text-gray-700">
+                        <th className="px-4 py-3">Sr. No.</th>
+                        <th className="px-4 py-3">Logo</th>
+                        <th className="px-4 py-3">Business Name</th>
+                        <th className="px-4 py-3">Description</th>
+                        <th className="px-4 py-3">FSSAI License</th>
+                        <th className="px-4 py-3">Veg/Non-Veg</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {listData.map((item: any, index) => (
+                      {listData.map((item, index) => (
                         <tr
-                          key={index}
-                          className="text-center bg-white shadow-md text-sm"
+                          key={item.vendorId || index}
+                          className={`text-center bg-white shadow-sm hover:bg-gray-50 transition-colors ${
+                            item.veg
+                              ? "shadow-[0_0_0_2px_rgba(34,197,94,0.3)]"
+                              : "shadow-[0_0_0_2px_rgba(248,113,113,0.3)]"
+                          }`}
                         >
-                          <td className="px-2 py-4 font-medium text-black rounded-tl-lg rounded-bl-lg">
-                            {(page.current_page - 1) * page.per_page +
-                              index +
-                              1}
+                          <td className="px-4 py-4 text-sm text-gray-900">
+                            {(page.current_page - 1) * page.per_page + index + 1}
                           </td>
-                          <td className="px-2 py-4 font-medium text-black">
+                          <td className="px-4 py-4">
                             {item.logoUrl && imageUrls[item.logoUrl] ? (
                               <img
                                 src={imageUrls[item.logoUrl]}
-                                className="max-w-20 max-h-20 mx-auto"
+                                className="w-16 h-16 mx-auto rounded-lg object-cover"
                                 alt="Vendor Logo"
                               />
                             ) : (
-                              "-"
+                              <span className="text-gray-500">-</span>
                             )}
                           </td>
-                          <td className="px-2 py-4 font-medium text-black">
-                            {item.businessName}
+                          <td className="px-4 py-4 text-sm text-gray-900">
+                            {item.businessName || "-"}
                           </td>
-                          <td className="px-2 py-4 font-medium text-black">
-                            {item.description}
+                          <td className="px-4 py-4 text-sm text-gray-600 max-w-xs truncate">
+                            {item.description || "-"}
                           </td>
-                          <td className="px-2 py-4 font-medium text-black">
-                            {item.fssaiLicense}
+                          <td className="px-4 py-4 text-sm text-gray-900">
+                            {item.fssaiLicense || "-"}
                           </td>
-                          <td className="px-2 py-4 font-medium text-black">
-                            <div className="flex justify-center">
-                              <span
-                                className={`border rounded-md py-1 px-3 ${
-                                  item.activeStatus
-                                    ? "text-blue-600 bg-blue-100"
-                                    : "text-white bg-yellow-600"
-                                }`}
-                              >
-                                {item.activeStatus ? "Active" : "notActive"}
-                              </span>
+                          <td className="px-4 py-4 text-sm">
+                            <div className="flex justify-center items-center gap-1">
+                              {item.veg ? (
+                                <Leaf className="w-5 h-5 text-green-500" />
+                              ) : (
+                                <Flame className="w-5 h-5 text-orange-500" />
+                              )}
+                              <span>{item.veg ? "Veg" : "Non-Veg"}</span>
                             </div>
                           </td>
-                          <td className="px-2 py-4 font-medium rounded-tr-lg rounded-br-lg">
-                            <div className="flex gap-2 justify-center items-center">
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                item.activeStatus
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-500"
+                              }`}
+                            >
+                              {item.activeStatus ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex gap-2 justify-center">
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleOpenEditModal(item.vendorId)}
-                                className="p-2.5"
+                                className="p-2 text-blue-600 hover:bg-blue-50"
                               >
                                 <Edit className="w-5 h-5" />
                               </Button>
@@ -318,7 +312,7 @@ const Restaurant: FC = () => {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => navigate(`/vender-detail/${item.vendorId}`)}
-                                className="p-2.5"
+                                className="p-2 text-green-600 hover:bg-green-50"
                               >
                                 <Eye className="w-5 h-5" />
                               </Button>
@@ -329,7 +323,7 @@ const Restaurant: FC = () => {
                                   setSelectedId(item.vendorId);
                                   setOpen(true);
                                 }}
-                                className="p-2.5 text-red-600 hover:text-red-800"
+                                className="p-2 text-red-600 hover:bg-red-50"
                               >
                                 <Trash2 className="w-5 h-5" />
                               </Button>
@@ -341,26 +335,28 @@ const Restaurant: FC = () => {
                   </table>
                 </div>
 
-                <div className="block sm:hidden space-y-4">
-                  {listData.map((item: any, index) => (
+                {/* Mobile Card View */}
+                <div className="block md:hidden space-y-4 p-4">
+                  {listData.map((item, index) => (
                     <div
-                      key={index}
-                      className="bg-white shadow-md rounded-lg p-4 border border-gray-200"
+                      key={item.vendorId || index}
+                      className={`bg-white shadow-lg rounded-xl p-4 border border-gray-100 ${
+                        item.veg
+                          ? "shadow-[0_0_0_2px_rgba(34,197,94,0.3)]"
+                          : "shadow-[0_0_0_2px_rgba(248,113,113,0.3)]"
+                      }`}
                     >
-                      <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-4">
                         <div className="flex justify-between items-center">
-                          <span className="font-medium text-black">
-                            #{" "}
-                            {(page.current_page - 1) * page.per_page +
-                              index +
-                              1}
+                          <span className="font-semibold text-gray-900">
+                            #{(page.current_page - 1) * page.per_page + index + 1}
                           </span>
                           <div className="flex gap-2">
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleOpenEditModal(item.vendorId)}
-                              className="p-2"
+                              className="p-2 text-blue-600 hover:bg-blue-50"
                             >
                               <Edit className="w-5 h-5" />
                             </Button>
@@ -368,7 +364,7 @@ const Restaurant: FC = () => {
                               size="sm"
                               variant="outline"
                               onClick={() => navigate(`/vender-detail/${item.vendorId}`)}
-                              className="p-2"
+                              className="p-2 text-green-600 hover:bg-green-50"
                             >
                               <Eye className="w-5 h-5" />
                             </Button>
@@ -379,51 +375,93 @@ const Restaurant: FC = () => {
                                 setSelectedId(item.vendorId);
                                 setOpen(true);
                               }}
-                              className="p-2 text-red-600 hover:text-red-800"
+                              className="p-2 text-red-600 hover:bg-red-50"
                             >
                               <Trash2 className="w-5 h-5" />
                             </Button>
                           </div>
                         </div>
-                        <div className="flex flex-col gap-2">
-                          {item.logoUrl && imageUrls[item.logoUrl] && (
+                        <div className="flex items-center gap-4">
+                          {item.logoUrl && imageUrls[item.logoUrl] ? (
                             <img
                               src={imageUrls[item.logoUrl]}
-                              className="max-w-24 max-h-24 mx-auto"
+                              className="w-16 h-16 rounded-full object-cover"
                               alt="Vendor Logo"
                             />
+                          ) : (
+                            <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
+                              No Image
+                            </div>
                           )}
-                          <div>
-                            <span className="font-medium text-black">
-                              Business Name:{" "}
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-lg text-gray-900">
+                              {item.businessName || "-"}
                             </span>
-                            {item.businessName}
+                            <div className="flex items-center gap-1 text-sm text-gray-600">
+                              {item.veg ? (
+                                <Leaf className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <Flame className="w-4 h-4 text-orange-500" />
+                              )}
+                              <span>{item.veg ? "Veg" : "Non-Veg"}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Description:
+                            </span>
+                            <p className="text-gray-600 line-clamp-2">
+                              {item.description || "-"}
+                            </p>
                           </div>
                           <div>
-                            <span className="font-medium text-black">
-                              Description:{" "}
+                            <span className="font-medium text-gray-700">
+                              FSSAI License:
                             </span>
-                            {item.description}
+                            <p className="text-gray-600">
+                              {item.fssaiLicense || "-"}
+                            </p>
                           </div>
                           <div>
-                            <span className="font-medium text-black">
-                              FSSAI License:{" "}
+                            <span className="font-medium text-gray-700">
+                              Rating:
                             </span>
-                            {item.fssaiLicense}
+                            <p className="text-gray-600 flex items-center gap-1">
+                              <span className="text-yellow-500">★</span>
+                              {(item.rating || 0).toFixed(1)}
+                            </p>
                           </div>
                           <div>
-                            <span className="font-medium text-black">
-                              Status:{" "}
+                            <span className="font-medium text-gray-700">
+                              Prep Time:
                             </span>
-                            <span
-                              className={`border rounded-md py-1 px-3 ${
+                            <p className="text-gray-600">
+                              {item.preparationTimeMin || 0} min
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Min Order:
+                            </span>
+                            <p className="text-gray-600">
+                              ₹{item.minOrderAmount || 0}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Status:
+                            </span>
+                            <p
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                                 item.activeStatus
-                                  ? "text-blue-600 bg-blue-100"
-                                  : "text-white bg-yellow-600"
-                                }`}
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-500"
+                              }`}
                             >
-                              {item.activeStatus ? "Active" : "notActive"}
-                            </span>
+                              {item.activeStatus ? "Active" : "Inactive"}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -431,7 +469,7 @@ const Restaurant: FC = () => {
                   ))}
                 </div>
 
-                <div className="w-full mt-4">
+                <div className="p-4">
                   <Pagination
                     numOfPages={page.last_page}
                     pageNo={page.current_page}
@@ -444,10 +482,13 @@ const Restaurant: FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center mt-12">
-                <h2 className="text-lg sm:text-xl font-semibold mb-4">
-                  No DATA Found
+              <div className="flex flex-col items-center justify-center mt-12 text-center">
+                <h2 className="text-xl font-semibold text-gray-700 mb-2">
+                  No Vendors Found
                 </h2>
+                <p className="text-gray-500">
+                  Add a new vendor to get started!
+                </p>
               </div>
             )}
           </div>
@@ -471,21 +512,21 @@ const Restaurant: FC = () => {
             Delete Vendor
           </Typography>
           <Typography variant="body1" mb={4} fontFamily="Nunito">
-            Are you sure you want to delete this record?
+            Are you sure you want to delete this vendor? This action cannot be undone.
           </Typography>
           <Box display="flex" justifyContent="flex-end" gap={2}>
             <Button
               variant="destructive"
               onClick={handleDelete}
-              className="w-full sm:w-auto px-4 py-2"
-              disabled={loading} // Disable button during loading
+              className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white"
+              disabled={loading}
             >
               Yes, Delete
             </Button>
             <Button
-              className="w-full sm:w-auto px-4 py-2 bg-gray-600"
+              className="w-full sm:w-auto px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white"
               onClick={handleClose}
-              disabled={loading} // Disable button during loading
+              disabled={loading}
             >
               No
             </Button>
