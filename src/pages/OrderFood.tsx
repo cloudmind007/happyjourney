@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Search, Star, Clock, Sprout, Drumstick } from "lucide-react";
 import api from "@/utils/axios";
-import LoaderModal from "@/components/LoaderModal";
 import Pagination from "@/components/Pagination";
 
 // Define interfaces
@@ -12,6 +11,11 @@ interface Station {
   stationId: number;
   stationCode: string;
   stationName: string;
+}
+
+interface Category {
+  categoryId: number;
+  name: string;
 }
 
 interface Vendor {
@@ -25,6 +29,7 @@ interface Vendor {
   preparationTimeMin: number;
   rating: number;
   address: string;
+  categories?: Category[];
 }
 
 interface PaginationData {
@@ -54,27 +59,62 @@ const OrderFood = () => {
   });
   const navigate = useNavigate();
 
-  // Fetch stations on mount
-  useEffect(() => {
-    const fetchStations = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get<{ data: Station[] }>("/api/stations/all");
-        if (Array.isArray(res.data)) {
-          setStations(res.data);
-        } else {
-          console.error("Unexpected station response:", res.data);
-        }
-      } catch (err) {
-        console.error("Error fetching stations", err);
-      } finally {
-        setLoading(false);
-      }
+  // Debounce function to delay API calls
+  const debounce = <F extends (...args: any[]) => void>(
+    func: F,
+    wait: number
+  ) => {
+    let timeout: NodeJS.Timeout;
+    return (...args: Parameters<F>) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
     };
-    fetchStations();
-  }, []);
+  };
 
-  // Fetch vendors when searchQuery or page changes
+  // Fetch stations based on search query
+  const fetchStations = useCallback(async (query: string, type: "stationCode" | "city") => {
+    if (!query.trim()) {
+      setStations([]);
+      setVendors([]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const params = type === "stationCode" ? { stationCode: query } : { city: query };
+      const res = await api.get<Station[]>("/stations/all", { params });
+      if (Array.isArray(res.data)) {
+        setStations(res.data);
+        // If stations are found, fetch vendors for the first station
+        if (res.data.length > 0) {
+          setPage((prev) => ({ ...prev, current_page: 1 }));
+          fetchVendors(res.data[0].stationId, 1, page.per_page);
+        } else {
+          setVendors([]);
+        }
+      } else {
+        console.error("Unexpected station response:", res.data);
+        setStations([]);
+        setVendors([]);
+      }
+    } catch (err) {
+      console.error("Error fetching stations", err);
+      setStations([]);
+      setVendors([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [page.per_page]);
+
+  // Debounced version of fetchStations
+  const debouncedFetchStations = useCallback(
+    debounce((query: string, type: "stationCode" | "city") => {
+      fetchStations(query, type);
+    }, 500),
+    [fetchStations]
+  );
+
+  // Fetch vendors for a given station
   const fetchVendors = async (stationId: number, pageNumber = 1, pageSize = 10) => {
     if (!stationId) return;
     setLoading(true);
@@ -87,7 +127,21 @@ const OrderFood = () => {
         totalPages: number;
       }>(`/vendors/stations/${stationId}?page=${pageNumber - 1}&size=${pageSize}`);
       
-      setVendors(res.data.content || []);
+      const vendorsData = res.data.content || [];
+      // Fetch categories for each vendor
+      const vendorsWithCategories = await Promise.all(
+        vendorsData.map(async (vendor) => {
+          try {
+            const categoriesRes = await api.get<Category[]>(`/menu/vendors/${vendor.vendorId}/categories`);
+            return { ...vendor, categories: categoriesRes.data };
+          } catch (error) {
+            console.error(`Failed to fetch categories for vendor ${vendor.vendorId}:`, error);
+            return { ...vendor, categories: [] };
+          }
+        })
+      );
+
+      setVendors(vendorsWithCategories);
       const { pageable, numberOfElements, totalElements, totalPages } = res.data;
       setPage({
         current_page: pageNumber,
@@ -106,19 +160,11 @@ const OrderFood = () => {
     }
   };
 
-  // Handle search
-  const handleSearch = () => {
-    const station = stations.find((s: Station) =>
-      searchType === "stationCode"
-        ? s.stationCode.toLowerCase() === searchQuery.toLowerCase()
-        : s.stationName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    if (station) {
-      setPage((prev) => ({ ...prev, current_page: 1 }));
-      fetchVendors(station.stationId, 1, page.per_page);
-    } else {
-      setVendors([]);
-    }
+  // Handle search input change
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    debouncedFetchStations(query, searchType);
   };
 
   // Handle pagination
@@ -127,13 +173,8 @@ const OrderFood = () => {
       const newPage = e.selected + 1;
       if (newPage !== page.current_page) {
         setPage((prev) => ({ ...prev, current_page: newPage }));
-        const station = stations.find((s: Station) =>
-          searchType === "stationCode"
-            ? s.stationCode.toLowerCase() === searchQuery.toLowerCase()
-            : s.stationName.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        if (station) {
-          fetchVendors(station.stationId, newPage, page.per_page);
+        if (stations.length > 0) {
+          fetchVendors(stations[0].stationId, newPage, page.per_page);
         }
       }
     }
@@ -143,13 +184,8 @@ const OrderFood = () => {
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSize = parseInt(e.target.value, 10);
     setPage((prev) => ({ ...prev, per_page: newSize, current_page: 1 }));
-    const station = stations.find((s: Station) =>
-      searchType === "stationCode"
-        ? s.stationCode.toLowerCase() === searchQuery.toLowerCase()
-        : s.stationName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    if (station) {
-      fetchVendors(station.stationId, 1, newSize);
+    if (stations.length > 0) {
+      fetchVendors(stations[0].stationId, 1, newSize);
     }
   };
 
@@ -179,13 +215,13 @@ const OrderFood = () => {
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => setSearchType("stationCode")}
-                className={`px-4 py-2 rounded-full text-sm ${searchType === "stationCode" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"}`}
+                className={`px-4 py-2 rounded-full text-sm ${searchType === "stationCode" ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
               >
                 Station Code
               </Button>
               <Button
                 onClick={() => setSearchType("city")}
-                className={`px-4 py-2 rounded-full text-sm ${searchType === "city" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"}`}
+                className={`px-4 py-2 rounded-full text-sm ${searchType === "city" ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
               >
                 City
               </Button>
@@ -194,14 +230,11 @@ const OrderFood = () => {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearchInputChange}
                 placeholder={`Enter ${searchType === "stationCode" ? "Station Code" : "City"}`}
-                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 py-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500"
               />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-5 text-gray-400" />
-              <Button onClick={handleSearch} className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white hover:bg-blue-700 rounded-full px-4 py-1 text-sm">
-                Search
-              </Button>
             </div>
           </div>
           <div className="w-full sm:w-1/3 flex justify-center sm:justify-end">
@@ -249,6 +282,11 @@ const OrderFood = () => {
                     )}
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-800">{vendor.businessName}</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {vendor.categories && vendor.categories.length > 0
+                          ? `Cuisines: ${vendor.categories.map(c => c.name).join(", ")}`
+                          : "No cuisines available"}
+                      </p>
                       <div className="flex flex-wrap gap-2 mt-2 text-sm text-gray-600">
                         <span className="flex items-center gap-1">
                           {vendor.veg ? (

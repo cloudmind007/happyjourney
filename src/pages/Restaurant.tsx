@@ -437,7 +437,7 @@ const Restaurant: FC = () => {
             >
               No
             </Button>
-          </Box>F
+          </Box>
         </Box>
       </Modal>
 
