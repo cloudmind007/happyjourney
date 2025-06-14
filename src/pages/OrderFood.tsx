@@ -63,7 +63,7 @@ const OrderFood = () => {
   const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
 
-  // Fetch image for vendor logo (async but doesn't block vendor display)
+  // Fetch image for vendor logo
   const fetchImage = async (logoUrl: string) => {
     if (!logoUrl || imageUrls[logoUrl]) return;
 
@@ -135,7 +135,7 @@ const OrderFood = () => {
     [fetchStations]
   );
 
-  // Fetch vendors - modified to show cards immediately
+  // Fetch vendors
   const fetchVendors = async (stationId: number, pageNumber = 1, pageSize = 10) => {
     if (!stationId) return;
     setLoading(true);
@@ -150,20 +150,17 @@ const OrderFood = () => {
 
       const vendorsData = res.data.content || [];
       
-      // First set vendors with empty categories
       setVendors(vendorsData.map(vendor => ({
         ...vendor,
         categories: []
       })));
 
-      // Start image loading in background
       vendorsData.forEach((vendor) => {
         if (vendor.logoUrl) {
           fetchImage(vendor.logoUrl);
         }
       });
 
-      // Then fetch and update categories
       const vendorsWithCategories = await Promise.all(
         vendorsData.map(async (vendor) => {
           try {
@@ -181,10 +178,8 @@ const OrderFood = () => {
         })
       );
 
-      // Update vendors with categories
       setVendors(vendorsWithCategories);
 
-      // Update pagination
       const { pageable, numberOfElements, totalElements, totalPages } = res.data;
       setPage({
         current_page: pageNumber,
@@ -203,7 +198,6 @@ const OrderFood = () => {
     }
   };
 
-  // Event handlers (keep existing handlers)
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
@@ -228,7 +222,6 @@ const OrderFood = () => {
     }
   };
 
-  // Cleanup
   useEffect(() => {
     return () => {
       Object.values(imageUrls).forEach((url) => {
@@ -239,7 +232,6 @@ const OrderFood = () => {
     };
   }, [imageUrls]);
 
-  // Render star rating with half-star support
   const renderStarRating = (rating: number) => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
@@ -266,147 +258,165 @@ const OrderFood = () => {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <div className="flex-1 p-4 md:p-6">
-      
-
-        {/* Search Section */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-          <div className="w-full sm:w-2/3 flex flex-col space-y-4">
+        {/* Enhanced Search Section with Perfect Image Alignment */}
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 mb-8">
+          <div className="w-full lg:w-1/2 flex flex-col space-y-4">
+            <div className="flex flex-col">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Find Food on Your Train Journey</h1>
+              <p className="text-gray-600">Order from top restaurants and get delivery at your station</p>
+            </div>
+            
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => setSearchType("stationCode")}
-                className={`px-4 py-2 rounded-full text-sm font-medium ${
-                  searchType === "stationCode" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  searchType === "stationCode" 
+                    ? "bg-blue-600 text-white shadow-md" 
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
                 Station Code
               </Button>
               <Button
                 onClick={() => setSearchType("city")}
-                className={`px-4 py-2 rounded-full text-sm font-medium ${
-                  searchType === "city" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  searchType === "city" 
+                    ? "bg-blue-600 text-white shadow-md" 
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
                 City
               </Button>
             </div>
-            <div className="relative w-full max-w-md">
+            
+            <div className="relative w-full">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={handleSearchInputChange}
-                placeholder={`Enter ${searchType === "stationCode" ? "Station Code" : "City"}`}
-                className="w-full pl-10 py-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
+                placeholder={`Search by ${searchType === "stationCode" ? "station code (e.g. NDLS)" : "city (e.g. Delhi)"}`}
+                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
               />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-5 text-gray-400" />
             </div>
           </div>
-          <div className="w-full sm:w-1/3 flex justify-center sm:justify-end">
-            <img
-              src="https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=2070&auto=format&fit=crop"
-              alt="Food Banner"
-              className="w-full max-w-xs h-24 sm:h-32 object-cover rounded-lg shadow-md"
-            />
+
+          {/* Responsive Image Container */}
+          <div className="w-full lg:w-1/2 h-full">
+            <div className="relative w-full h-48 md:h-64 lg:h-80 rounded-xl overflow-hidden shadow-lg">
+              <img
+                src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80"
+                alt="Delicious food on train"
+                className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Fresh Meals Delivered to Your Seat</h2>
+                  <p className="text-gray-200 mt-1">Enjoy restaurant-quality food during your journey</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Vendor Cards - Now shows immediately */}
+        {/* Vendor Cards */}
         {vendors.length > 0 && (
-          <div className="mb-4">
-            <div className="flex justify-end mb-4">
-              <select
-                value={page.per_page}
-                onChange={handlePageSizeChange}
-                className="border border-gray-300 rounded-full px-3 py-1 text-sm text-gray-600 shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                <option value={10}>10 Records</option>
-                <option value={25}>25 Records</option>
-                <option value={50}>50 Records</option>
-              </select>
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-2 sm:mb-0">
+                Available Restaurants ({page.total})
+              </h2>
+              <div className="flex items-center gap-4">
+                <select
+                  value={page.per_page}
+                  onChange={handlePageSizeChange}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-600 shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                >
+                  <option value={10}>Show 10</option>
+                  <option value={25}>Show 25</option>
+                  <option value={50}>Show 50</option>
+                </select>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {vendors.map((vendor) => (
                 <div
                   key={vendor.vendorId}
-                  className={`bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer border border-gray-100 ${
-                    vendor.veg ? "border-b-2 border-b-green-500" : "border-b-2 border-b-red-500"
+                  className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-200 ${
+                    vendor.veg ? "border-t-4 border-t-green-500" : "border-t-4 border-t-red-500"
                   }`}
                   onClick={() => navigate(`/vendor-detail/${vendor.vendorId}`)}
                 >
-                  <div className="flex flex-col sm:flex-row">
-                    {/* Image will load when ready */}
-                    <div className="relative w-full sm:w-1/3 h-32 sm:h-auto">
-                      {vendor.logoUrl && imageUrls[vendor.logoUrl] ? (
-                        <img
-                          src={imageUrls[vendor.logoUrl]}
-                          className="w-full h-full object-cover"
-                          alt="Vendor Logo"
-                        />
+                  <div className="relative h-48 w-full">
+                    {vendor.logoUrl && imageUrls[vendor.logoUrl] ? (
+                      <img
+                        src={imageUrls[vendor.logoUrl]}
+                        className="w-full h-full object-cover"
+                        alt={vendor.businessName}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=150&auto=format&fit=crop";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                        <span className="text-gray-400 text-sm">Loading image...</span>
+                      </div>
+                    )}
+                    <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-full p-1 shadow-sm">
+                      {vendor.veg ? (
+                        <Sprout className="w-5 h-5 text-green-500" />
                       ) : (
-                        <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
-                          {vendor.logoUrl ? "Loading..." : "No Image"}
-                        </div>
+                        <Drumstick className="w-5 h-5 text-red-500" />
                       )}
                     </div>
-                    <div className="w-full sm:w-2/3 p-3 flex flex-col justify-between">
-                      <div>
-                        <div className="flex justify-between items-start mb-1">
-                          <h3 className="text-lg font-semibold text-gray-800 line-clamp-1">
-                            {vendor.businessName}
-                          </h3>
-                          <div className="flex items-center gap-1 bg-white px-1 py-0.5 rounded">
-                            {vendor.veg ? (
-                              <Sprout className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <Drumstick className="w-4 h-4 text-red-500" />
-                            )}
-                            <span className="text-xs font-medium text-gray-800">
-                              {vendor.veg ? "Veg" : "Non-Veg"}
-                            </span>
-                          </div>
-                        </div>
-                        <p className="text-xs text-gray-600 line-clamp-1 mb-2">
-                          {vendor.description}
-                        </p>
-                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-600">
-                          <div>
-                            <span className="font-medium">FSSAI:</span> {vendor.fssaiLicense}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">Rating:</span>
-                            {renderStarRating(vendor.rating || 0)}
-                          </div>
-                          <div>
-                            <Clock className="w-3 h-3 text-gray-500 inline mr-1" />
-                            {vendor.preparationTimeMin || 0} min
-                          </div>
-                          <div>
-                            <span className="font-medium">Min Order:</span> ₹{vendor.minOrderAmount || 0}
-                          </div>
-                          <div className="col-span-2">
-                            <span className="font-medium">Cuisines:</span>{" "}
-                            {vendor.categories?.length ? 
-                              vendor.categories.map(c => c.categoryName).join(", ") : 
-                              "Loading cuisines..."}
-                          </div>
-                        </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-lg font-bold text-gray-800 line-clamp-1">
+                        {vendor.businessName}
+                      </h3>
+                      <div className="flex items-center bg-blue-50 px-2 py-1 rounded-full">
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        <span className="text-xs font-semibold text-blue-800 ml-1">
+                          {vendor.rating?.toFixed(1) || "New"}
+                        </span>
                       </div>
-                      <Button
-                        className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-1 text-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/vendor-detail/${vendor.vendorId}`);
-                        }}
-                      >
-                        View Menu
-                      </Button>
                     </div>
+                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                      {vendor.description || "No description available"}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-gray-600 mb-4">
+                      <div className="flex items-center">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {vendor.preparationTimeMin || 15} min
+                      </div>
+                      <div>
+                        <span className="font-medium">Min:</span> ₹{vendor.minOrderAmount || 99}
+                      </div>
+                      <div className="col-span-2">
+                        <span className="font-medium">Cuisines:</span>{" "}
+                        {vendor.categories?.slice(0, 3).map(c => c.categoryName).join(", ")}
+                        {vendor.categories.length > 3 && "..."}
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/vendor-detail/${vendor.vendorId}`);
+                      }}
+                    >
+                      View Menu
+                    </Button>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="w-full mt-6 flex flex-col items-center gap-4">
+            <div className="mt-8">
               <Pagination
                 numOfPages={page.last_page}
                 pageNo={page.current_page}
@@ -421,18 +431,19 @@ const OrderFood = () => {
         )}
 
         {searchQuery && vendors.length === 0 && !loading && (
-          <div className="flex flex-col items-center justify-center mt-12">
-            <h2 className="text-lg font-semibold text-gray-700">No Vendors Found</h2>
-            <p className="text-sm text-gray-500 mt-2">
-              Try a different {searchType === "stationCode" ? "station code" : "city"}.
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="bg-gray-100 p-6 rounded-full mb-4">
+              <Search className="w-8 h-8 text-gray-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-700">No restaurants found</h2>
+            <p className="text-gray-500 mt-2">
+              Try searching for a different {searchType === "stationCode" ? "station" : "city"}
             </p>
           </div>
         )}
+
         <WhyChooseRelswad />
       </div>
-
-      
-      
     </div>
   );
 };

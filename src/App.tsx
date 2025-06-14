@@ -18,6 +18,17 @@ import UserOrders from "./pages/UserOrders";
 import { AuthProvider } from "./contexts/AuthContext";
 import PrivateRoute from "./layout/PrivateRoute";
 import BulkOrderForm from "./pages/BulkOrderForm";
+import WalletPage from "./pages/WalletPage";
+import CancellationPolicy from "./pages/CancellationPolicy";
+import ComplaintPage from "./pages/ComplaintForm";
+import FeedbackPage from "./pages/FeedbackForm";
+import HelpAndSupport from "./pages/HelpAndSupport ";
+import OrderHistory from "./pages/OrderHistory";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import ComplaintForm from "./pages/ComplaintForm";
+import ContactForm from "./pages/ContactForm";
+import FeedbackForm from "./pages/FeedbackForm";
 
 const App = () => {
   return (
@@ -47,13 +58,22 @@ const App = () => {
             <Route path="/vendor/orders" element={<VendorOrders />} />
           </Route>
 
-          <Route element={<PrivateRoute allowedRoles={["user"]} />}>
-            <Route path="/home" element={<OrderFood  />} />
-            <Route path="/cart" element={<OrderFood />} />
-            <Route path="/bulk-order" element={<BulkOrderForm />} />
-            {/* <Route path="/cart" element={<OrderFood />} />
-            <Route path="/cart" element={<OrderFood />} />             */}
-          </Route>
+          <Route element={<PrivateRoute allowedRoles={['user']} />}>
+          <Route path="/" element={<OrderFood />} />
+          <Route path="/home" element={<OrderFood />} />
+          <Route path="/cart" element={<OrderFood />} />
+          <Route path="/bulk-order" element={<BulkOrderForm />} />
+          <Route path="/complaints" element={<ComplaintForm />} />
+          <Route path="/feedback" element={<FeedbackForm />} />
+          <Route path="/contact" element={<ContactForm />} />
+          <Route path="/wallet" element={<WalletPage />} />
+          {/* <Route path="/order-history" element={<OrderHistory />} /> */}
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/cancellation-policy" element={<CancellationPolicy />} />
+          <Route path="/terms" element={<TermsAndConditions />} />
+          <Route path="/help" element={<HelpAndSupport />} />
+          {/* <Route path="/vendor/:vendorId" element={<VendorDetail />} /> */}
+        </Route>
 
           <Route
             path="/"
