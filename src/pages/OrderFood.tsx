@@ -254,12 +254,7 @@ const renderStarRating = (rating: number) => {
     <div className="flex min-h-screen bg-gray-50">
       <div className="flex-1 p-4 md:p-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-800">Order Food</h1>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-purple-600 text-white flex items-center justify-center rounded-full">U</div>
-          </div>
-        </div>
+  
 
         {/* Search Section */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
