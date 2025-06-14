@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { ChevronDown, ChevronUp, Edit, Trash2, Plus, Star, Clock, Leaf, Utensils } from "lucide-react";
+import { ChevronDown, ChevronUp, Edit, Trash2, Plus, Star, Clock, Leaf, Utensils, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import AddCategoryModal from "@/components/AddCategoryModal";
 import AddMenuItemModal from "@/components/AddMenuItemModal";
 import api from "@/utils/axios";
@@ -11,7 +13,7 @@ interface Vendor {
   vendorId: number;
   businessName: string;
   description: string;
-  logoUrl: string; // Contains systemFileName (e.g., UUID-filename.jpg)
+  logoUrl: string;
   preparationTimeMin: number;
   rating: number;
   veg: boolean;
@@ -56,19 +58,23 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isMenuItemModalOpen, setIsMenuItemModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [refresh, setRefresh] = useState(false);
   const [mode, setMode] = useState<"add" | "edit">("add");
   const [isMobile, setIsMobile] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [clearExisting, setClearExisting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const effectiveVendorId = vendorId || Number(urlId);
   const isVendor = role?.toLowerCase() === "vendor";
+  const isAdmin = role?.toLowerCase() === "admin";
 
-  // Base URL for the download endpoint
   const DOWNLOAD_ENDPOINT = "http://94.136.184.78:8080/api/files/download";
 
-  // Construct logo URL using systemFileName
   const getLogoUrl = (systemFileName: string) => {
     return `${DOWNLOAD_ENDPOINT}?systemFileName=${encodeURIComponent(systemFileName)}`;
   };
@@ -77,7 +83,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
     vendorId: effectiveVendorId,
     businessName: "Tasty Bites",
     description: "A cozy restaurant serving delicious vegetarian meals.",
-    logoUrl: "5e815990-aa46-4d4f-b493-48dbde3737a3-amr-taha-Zbvr7FWB4fc-unsplash.jpg", // Example systemFileName
+    logoUrl: "5e815990-aa46-4d4f-b493-48dbde3737a3-amr-taha-Zbvr7FWB4fc-unsplash.jpg",
     preparationTimeMin: 30,
     rating: 4.5,
     veg: true,
@@ -188,6 +194,48 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && (file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || file.type === "application/vnd.ms-excel")) {
+      setSelectedFile(file);
+      setUploadError(null);
+    } else {
+      setSelectedFile(null);
+      setUploadError("Please select a valid Excel file (.xlsx or .xls).");
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      setUploadError("Please select a file to upload.");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("vendorId", effectiveVendorId.toString());
+    formData.append("clearExisting", clearExisting.toString());
+
+    try {
+      const response = await api.post("/menu/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      console.log("Upload successful:", response.data);
+      setRefresh(!refresh);
+      setIsUploadModalOpen(false);
+      setSelectedFile(null);
+      setClearExisting(false);
+    } catch (error: any) {
+      console.error("Upload failed:", error);
+      setUploadError(error.response?.data || "Failed to upload the file.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const toggleCategory = (categoryId: number) => {
     setExpandedCategory(expandedCategory === categoryId ? null : categoryId);
   };
@@ -205,7 +253,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
           className="w-full h-64 object-cover"
           onError={(e) => {
             console.error("Failed to load logo:", vendor?.logoUrl);
-            e.currentTarget.src = "https://via.placeholder.com/1500x500"; // Fallback image
+            e.currentTarget.src = "https://via.placeholder.com/1500x500";
           }}
         />
         <div className="absolute bottom-0 left-0 p-6 text-white">
@@ -236,16 +284,26 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
             <Utensils className="w-5 h-5 mr-2 text-amber-500" />
             Menu
           </h2>
-          {!isViewOnly && !isVendor && (
-            <Button
-              onClick={() => {
-                setMode("add");
-                setIsCategoryModalOpen(true);
-              }}
-              className="bg-amber-600 hover:bg-amber-700"
-            >
-              <Plus className="mr-2 h-4 w-4" /> Add Category
-            </Button>
+          {!isViewOnly && (
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setMode("add");
+                  setIsCategoryModalOpen(true);
+                }}
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add Category
+              </Button>
+              {isAdmin && (
+                <Button
+                  onClick={() => setIsUploadModalOpen(true)}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Upload className="mr-2 h-4 w-4" /> Upload Excel
+                </Button>
+              )}
+            </div>
           )}
         </div>
 
@@ -491,6 +549,75 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
             vendorId={effectiveVendorId}
             categories={categories}
           />
+          <Dialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Upload Menu Excel File</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Select Excel File
+                  </label>
+                  <Input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileChange}
+                    disabled={isUploading}
+                    className="w-full"
+                  />
+                  {selectedFile && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Selected: {selectedFile.name}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="clearExisting"
+                    checked={clearExisting}
+                    onCheckedChange={(checked: boolean) => setClearExisting(checked as boolean)}
+                    disabled={isUploading}
+                  />
+                  <label
+                    htmlFor="clearExisting"
+                    className="text-sm text-gray-700"
+                  >
+                    Clear existing menu items
+                  </label>
+                </div>
+                {uploadError && (
+                  <p className="text-sm text-red-600">{uploadError}</p>
+                )}
+                {isUploading && (
+                  <div className="flex justify-center">
+                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsUploadModalOpen(false);
+                    setSelectedFile(null);
+                    setClearExisting(false);
+                    setUploadError(null);
+                  }}
+                  disabled={isUploading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpload}
+                  disabled={isUploading || !selectedFile}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {isUploading ? "Uploading..." : "Upload"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>

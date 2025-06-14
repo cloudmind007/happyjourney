@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import api from "../utils/axios";
 
 type RegisterFormInputs = {
@@ -19,6 +20,7 @@ const Register: React.FC = () => {
     formState: { errors },
     setError,
   } = useForm<RegisterFormInputs>();
+  const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async (data: RegisterFormInputs) => {
     try {
@@ -27,8 +29,6 @@ const Register: React.FC = () => {
       if (res.status === 200) {
         navigate("/verify-otp", { state: { email: data.email } });
       }
-
-      // navigate("/login");
     } catch (error: any) {
       if (error.response?.data?.message) {
         setError("email", {
@@ -51,7 +51,7 @@ const Register: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Email
             </label>
-            <input
+            <input  
               type="email"
               {...register("email", {
                 required: "Email is required",
@@ -111,13 +111,26 @@ const Register: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
-            <input
-              type="password"
-              {...register("password", { required: "Password is required" })}
-              className={`w-full px-4 py-2 border ${
-                errors.password ? "border-red-500" : "border-gray-300"
-              } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                {...register("password", { required: "Password is required" })}
+                className={`w-full px-4 py-2 border ${
+                  errors.password ? "border-red-500" : "border-gray-300"
+                } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+              >
+                {showPassword ? (
+                  <AiOutlineEyeInvisible className="h-5 w-5" />
+                ) : (
+                  <AiOutlineEye className="h-5 w-5" />
+                )}
+              </button>
+            </div>
             {errors.password && (
               <p className="text-sm text-red-500 mt-1">
                 {errors.password.message}

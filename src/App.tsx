@@ -38,7 +38,6 @@ const App = () => {
             <Route path="/restaurant" element={<Restaurant />} />
             <Route path="/customers" element={<Customer />} />
             <Route path="/stations" element={<Station />} />
-            <Route path="/orders" element={<OrderFood />} />
             <Route path="/vender-detail/:id" element={<RestaurantDetail />} />
           </Route>
 
@@ -49,6 +48,7 @@ const App = () => {
 
           <Route element={<PrivateRoute allowedRoles={["user"]} />}>
             <Route path="/home" element={<Home />} />
+            <Route path="/orders" element={<OrderFood />} />
             <Route path="/user/orders" element={<UserOrders />} />
           </Route>
 

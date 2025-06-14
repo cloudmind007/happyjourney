@@ -38,7 +38,7 @@ const mockOrders: OrderDTO[] = [
   {
     orderId: 1,
     customerId: 101,
-    vendorId: 6,
+    vendorId: 12,
     trainId: 12345,
     pnrNumber: "PNR123456",
     coachNumber: "B1",
@@ -62,7 +62,7 @@ const mockOrders: OrderDTO[] = [
   {
     orderId: 2,
     customerId: 102,
-    vendorId: 6,
+    vendorId: 12,
     trainId: 12346,
     pnrNumber: "PNR654321",
     coachNumber: "A2",
@@ -86,7 +86,7 @@ const mockOrders: OrderDTO[] = [
   {
     orderId: 3,
     customerId: 103,
-    vendorId: 6,
+    vendorId: 12,
     trainId: 12347,
     pnrNumber: "PNR112233",
     coachNumber: "S3",
@@ -120,7 +120,7 @@ const paymentColors = {
   PAID: "bg-green-100 text-green-800",
   PENDING: "bg-amber-100 text-amber-800",
   FAILED: "bg-red-100 text-red-800",
-};
+};  
 
 const paymentMethodIcons = {
   COD: <MdPayment className="text-red-500" title="Cash on Delivery" />,
