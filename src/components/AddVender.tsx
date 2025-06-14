@@ -32,12 +32,14 @@ type FormData = {
   description: string;
   logoUrl: string;
   fssaiLicense: string;
+  gstNumber: string | null;
   stationId: number;
   address: string;
   preparationTimeMin: number;
   minOrderAmount: number;
   rating: number;
   activeStatus: boolean;
+  veg: boolean;
 };
 
 interface IndiProps {
@@ -75,6 +77,7 @@ const validationSchema = yup.object().shape({
     otherwise: (schema) => schema.notRequired(),
   }),
   fssaiLicense: yup.string().required("FSSAI License is required"),
+  gstNumber: yup.string().nullable(),
   stationId: yup
     .number()
     .required("Station ID is required")
@@ -94,6 +97,7 @@ const validationSchema = yup.object().shape({
     .min(0, "Rating cannot be less than 0")
     .max(5, "Rating cannot be more than 5"),
   activeStatus: yup.boolean().required("Active status is required"),
+  veg: yup.boolean().required("Vegetarian status is required"),
 });
 
 export default function AddVendor({
@@ -104,9 +108,10 @@ export default function AddVendor({
   mode,
   setRefresh,
   refresh,
-}: IndiProps) {``
+}: IndiProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [logoUrlPreview, setlogoUrlPreview] = useState<string | null>(null);
+  const [logoUrlPreview, setLogoUrlPreview] = useState<string | null>(null);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [stationsList, setStationsList] = useState<Station[]>([]);
 
   const {
@@ -127,18 +132,21 @@ export default function AddVendor({
       description: "",
       logoUrl: "",
       fssaiLicense: "",
+      gstNumber: null,
       stationId: 0,
       address: "",
       preparationTimeMin: 0,
       minOrderAmount: 0,
       rating: 0,
       activeStatus: true,
+      veg: false,
     },
   });
 
   const handleClose = () => {
     setId(null);
-    setlogoUrlPreview(null);
+    setLogoUrlPreview(null);
+    setUploadedFileUrl(null);
     reset();
     setOpen(false);
   };
@@ -150,10 +158,9 @@ export default function AddVendor({
         const res = await api.get(
           `/stations?page=${pageNumber - 1}&size=${pageSize}`
         );
-
         setStationsList(res.data.content || []);
       } catch (error) {
-        console.error("Failed to fetch data:", error);
+        console.error("Failed to fetch stations:", error);
       } finally {
         setIsLoading(false);
       }
@@ -168,7 +175,12 @@ export default function AddVendor({
           setIsLoading(true);
           const res = await api.get(`/vendors/${id}`);
           if (res.status === 200 && res.data) {
-            setlogoUrlPreview(res.data.logoUrl || null);
+            const fileUrl = res.data.logoUrl;
+            const logoUrl = fileUrl
+              ? `/file/download?systemFileName=${fileUrl}`
+              : null;
+            setUploadedFileUrl(fileUrl || null);
+            setLogoUrlPreview(logoUrl);
             reset({
               email: res.data.email || "",
               username: res.data.username || "",
@@ -176,14 +188,16 @@ export default function AddVendor({
               password: "",
               businessName: res.data.businessName || "",
               description: res.data.description || "",
-              logoUrl: res.data.logoUrl || "",
+              logoUrl: fileUrl || "",
               fssaiLicense: res.data.fssaiLicense || "",
+              gstNumber: res.data.gstNumber || null,
               stationId: res.data.stationId || 0,
               address: res.data.address || "",
               preparationTimeMin: res.data.preparationTimeMin || 0,
               minOrderAmount: res.data.minOrderAmount || 0,
               rating: res.data.rating || 0,
               activeStatus: res.data.activeStatus ?? true,
+              veg: res.data.isVeg ?? false,
             });
           }
         } catch (error) {
@@ -193,23 +207,37 @@ export default function AddVendor({
         }
       }
     };
-
     fetchVendorData();
   }, [id, mode, reset]);
 
+  // Retry loading the image if uploadedFileUrl is set but logoUrlPreview is not
+  useEffect(() => {
+    if (uploadedFileUrl && !logoUrlPreview) {
+      const apiPreviewUrl = `/file/download?systemFileName=${uploadedFileUrl}`;
+      const img = new Image();
+      img.src = apiPreviewUrl;
+      img.onload = () => {
+        setLogoUrlPreview(apiPreviewUrl);
+      };
+      img.onerror = () => {
+        console.error("Failed to load image from API:", apiPreviewUrl);
+        setLogoUrlPreview(null);
+      };
+    }
+  }, [uploadedFileUrl, logoUrlPreview]);
+
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setIsLoading(true);
-
     try {
       const endpoint =
         mode === "edit" && id ? `/vendors/${id}` : "/auth/create-vendor";
       const method = mode === "edit" ? api.put : api.post;
-
+      const { veg, ...restData } = data;
       const payload = {
-        ...data,
+        ...restData,
         verified: true,
+        isVeg: veg,
       };
-
       const res = await method(endpoint, payload);
       if (res.status === 200 || res.status === 201) {
         setRefresh(!refresh);
@@ -227,13 +255,14 @@ export default function AddVendor({
   };
 
   const handleFileChange = async (
-    onChange: (value: File | null) => void,
+    onChange: (value: string) => void,
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0] || null;
-    onChange(file);
-
+    const file = event.target.files?.[0];
     if (file) {
+      const tempPreview = URL.createObjectURL(file);
+      setLogoUrlPreview(tempPreview);
+
       const formData = new FormData();
       formData.append("file", file);
 
@@ -241,18 +270,36 @@ export default function AddVendor({
         const resp = await api.post("/files/upload", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        console.log(resp);
 
-        if (resp.status === 200) {
-          setValue("logoUrl", resp.data.fileUrl);
+        if (resp.status === 200 && resp.data.fileUrl) {
+          const fileUrl = resp.data.fileUrl;
+          onChange(fileUrl);
+          setValue("logoUrl", fileUrl, { shouldDirty: true });
+          setUploadedFileUrl(fileUrl);
+
+          const apiPreviewUrl = `/file/download?systemFileName=${fileUrl}`;
+          const img = new Image();
+          img.src = apiPreviewUrl;
+          img.onload = () => {
+            setLogoUrlPreview(apiPreviewUrl);
+            URL.revokeObjectURL(tempPreview); // Clean up temporary URL
+          };
+          img.onerror = () => {
+            console.error("Failed to load image from API:", apiPreviewUrl);
+            setLogoUrlPreview(null); // Clear preview if API fails
+          };
+        } else {
+          setLogoUrlPreview(null);
+          setUploadedFileUrl(null);
         }
-        setlogoUrlPreview(URL.createObjectURL(file));
       } catch (error) {
         console.error("Error uploading file:", error);
-        setlogoUrlPreview(null);
+        setLogoUrlPreview(null);
+        setUploadedFileUrl(null);
       }
     } else {
-      setlogoUrlPreview(null);
+      setLogoUrlPreview(null);
+      setUploadedFileUrl(null);
     }
   };
 
@@ -262,7 +309,7 @@ export default function AddVendor({
   ) => {
     onChange(Number(event.target.value));
   };
-  
+
   return (
     <Modal
       open={open}
@@ -488,6 +535,23 @@ export default function AddVendor({
                     error={!!errors.fssaiLicense}
                     helperText={errors.fssaiLicense?.message}
                     size="small"
+                  />
+                )}
+              />
+
+              <Controller
+                name="gstNumber"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="GST Number (Optional)"
+                    variant="outlined"
+                    fullWidth
+                    error={!!errors.gstNumber}
+                    helperText={errors.gstNumber?.message}
+                    size="small"
+                    onChange={(e) => field.onChange(e.target.value || null)}
                   />
                 )}
               />
@@ -724,10 +788,29 @@ export default function AddVendor({
                   )}
                 />
               </Box>
+
+              <Box>
+                <Controller
+                  name="veg"
+                  control={control}
+                  render={({ field }) => (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={field.value}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                          color="primary"
+                        />
+                      }
+                      label="Vegetarian Only"
+                      sx={{ mt: 1 }}
+                    />
+                  )}
+                />
+              </Box>
             </Box>
           </Box>
 
-          {/* Moved buttons inside the form */}
           <Box
             sx={{
               display: "flex",

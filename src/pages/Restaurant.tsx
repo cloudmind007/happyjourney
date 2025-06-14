@@ -40,6 +40,7 @@ const Restaurant: FC = () => {
     remainingPages: 0,
     last_page: 0,
   });
+  const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
 
   const handleOpenAddModal = () => {
     setMode("add");
@@ -72,6 +73,33 @@ const Restaurant: FC = () => {
     }
   };
 
+  const fetchImage = async (logoUrl: string) => {
+    if (!logoUrl || imageUrls[logoUrl]) return;
+
+    // Use the full logoUrl as the systemFileName, as expected by the backend
+    const systemFileName = logoUrl; // e.g., a6adfea7-111d-4cae-b66a-7e51d37fc6e9-icons8-machine-100.png
+
+    try {
+      // Make API call to fetch the image blob, sending the full systemFileName
+      const response = await api.get(
+        `/files/download?systemFileName=${systemFileName}`,
+        { responseType: "blob" }
+      );
+
+      if (response.status === 200) {
+        const blob = response.data;
+        const url = URL.createObjectURL(blob);
+        setImageUrls((prev) => ({ ...prev, [logoUrl]: url }));
+      }
+    } catch (error) {
+      console.error(`Failed to fetch image for ${systemFileName}:`, error);
+      setImageUrls((prev) => ({
+        ...prev,
+        [logoUrl]: "https://via.placeholder.com/80?text=No+Image",
+      }));
+    }
+  };
+
   const getData = async (pageNumber = 1, pageSize = 10) => {
     setLoading(true);
     try {
@@ -79,7 +107,16 @@ const Restaurant: FC = () => {
         `/vendors?page=${pageNumber - 1}&size=${pageSize}`
       );
 
-      setListData(res.data.content || []);
+      const vendors = res.data.content || [];
+      setListData(vendors);
+
+      // Fetch images for all vendors on the current page
+      // item.logoUrl contains the full systemFileName (e.g., "a6adfea7-111d-4cae-b66a-7e51d37fc6e9-icons8-machine-100.png")
+      vendors.forEach((item: any) => {
+        if (item.logoUrl) {
+          fetchImage(item.logoUrl);
+        }
+      });
 
       const { pageable, numberOfElements, totalElements, totalPages } =
         res.data;
@@ -137,6 +174,17 @@ const Restaurant: FC = () => {
   useEffect(() => {
     getData(page.current_page, page.per_page);
   }, [refresh]);
+
+  // Clean up object URLs on component unmount
+  useEffect(() => {
+    return () => {
+      Object.values(imageUrls).forEach((url) => {
+        if (!url.includes("via.placeholder.com")) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, [imageUrls]);
 
   return (
     <div className="min-h-screen w-full">
@@ -222,9 +270,9 @@ const Restaurant: FC = () => {
                               1}
                           </td>
                           <td className="px-2 py-4 font-medium text-black">
-                            {item.logoUrl ? (
+                            {item.logoUrl && imageUrls[item.logoUrl] ? (
                               <img
-                                src={`${item.logoUrl}`}
+                                src={imageUrls[item.logoUrl]}
                                 className="max-w-20 max-h-20 mx-auto"
                                 alt="Vendor Logo"
                               />
@@ -336,9 +384,9 @@ const Restaurant: FC = () => {
                           </div>
                         </div>
                         <div className="flex flex-col gap-2">
-                          {item.logoUrl && (
+                          {item.logoUrl && imageUrls[item.logoUrl] && (
                             <img
-                              src={`${item.logoUrl}`}
+                              src={imageUrls[item.logoUrl]}
                               className="max-w-24 max-h-24 mx-auto"
                               alt="Vendor Logo"
                             />

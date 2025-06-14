@@ -11,7 +11,7 @@ interface Vendor {
   vendorId: number;
   businessName: string;
   description: string;
-  logoUrl: string;
+  logoUrl: string; // Contains systemFileName (e.g., UUID-filename.jpg)
   preparationTimeMin: number;
   rating: number;
   veg: boolean;
@@ -65,11 +65,19 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
   const effectiveVendorId = vendorId || Number(urlId);
   const isVendor = role?.toLowerCase() === "vendor";
 
+  // Base URL for the download endpoint
+  const DOWNLOAD_ENDPOINT = "http://94.136.184.78:8080/api/files/download";
+
+  // Construct logo URL using systemFileName
+  const getLogoUrl = (systemFileName: string) => {
+    return `${DOWNLOAD_ENDPOINT}?systemFileName=${encodeURIComponent(systemFileName)}`;
+  };
+
   const staticVendorData: Vendor = {
     vendorId: effectiveVendorId,
     businessName: "Tasty Bites",
     description: "A cozy restaurant serving delicious vegetarian meals.",
-    logoUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80",
+    logoUrl: "5e815990-aa46-4d4f-b493-48dbde3737a3-amr-taha-Zbvr7FWB4fc-unsplash.jpg", // Example systemFileName
     preparationTimeMin: 30,
     rating: 4.5,
     veg: true,
@@ -192,9 +200,13 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
       <div className="relative rounded-2xl overflow-hidden shadow-lg">
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
         <img
-          src={vendor?.logoUrl || "https://via.placeholder.com/1500x500"}
-          alt={vendor?.businessName}
+          src={vendor?.logoUrl ? getLogoUrl(vendor.logoUrl) : "https://via.placeholder.com/1500x500"}
+          alt={vendor?.businessName || "Restaurant"}
           className="w-full h-64 object-cover"
+          onError={(e) => {
+            console.error("Failed to load logo:", vendor?.logoUrl);
+            e.currentTarget.src = "https://via.placeholder.com/1500x500"; // Fallback image
+          }}
         />
         <div className="absolute bottom-0 left-0 p-6 text-white">
           <h1 className="text-3xl font-bold">{vendor?.businessName || "Restaurant"}</h1>
