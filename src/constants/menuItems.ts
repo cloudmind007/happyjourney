@@ -14,6 +14,7 @@ import {
   FileText,
   HelpCircle,
   LucideIcon,
+  Phone,
 } from "lucide-react";
 
 export type MenuItem = {
@@ -45,5 +46,7 @@ export const userMenuItems: MenuItem[] = [
   { icon: Shield, label: "Privacy Policy", path: "/privacy-policy" },
   { icon: XCircle, label: "Cancellation Policy", path: "/cancellation-policy" },
   { icon: FileText, label: "Terms & Conditions", path: "/terms" },
-  { icon: HelpCircle, label: "Help & Support", path: "/help" }
+  { icon: HelpCircle, label: "Help & Support", path: "/help" },
+  { icon: Phone, label: "Contact Us", path: "/contact" }
+
 ];

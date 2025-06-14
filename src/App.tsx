@@ -67,7 +67,7 @@ const App = () => {
           <Route path="/feedback" element={<FeedbackForm />} />
           <Route path="/contact" element={<ContactForm />} />
           <Route path="/wallet" element={<WalletPage />} />
-          {/* <Route path="/order-history" element={<OrderHistory />} /> */}
+          <Route path="/order-history" element={<OrderHistory />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/cancellation-policy" element={<CancellationPolicy />} />
           <Route path="/terms" element={<TermsAndConditions />} />
