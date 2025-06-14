@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Star, Clock, Sprout, Drumstick } from "lucide-react";
 import api from "@/utils/axios";
 import Pagination from "@/components/Pagination";
+import WhyChooseRelswad from "./WhyChooseRelswad";
 
 // Define interfaces
 interface Station {
@@ -427,7 +428,11 @@ const OrderFood = () => {
             </p>
           </div>
         )}
+        <WhyChooseRelswad />
       </div>
+
+      
+      
     </div>
   );
 };

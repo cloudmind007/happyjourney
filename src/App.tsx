@@ -17,6 +17,7 @@ import VendorOrders from "./pages/VendorOrders";
 import UserOrders from "./pages/UserOrders";
 import { AuthProvider } from "./contexts/AuthContext";
 import PrivateRoute from "./layout/PrivateRoute";
+import BulkOrderForm from "./pages/BulkOrderForm";
 
 const App = () => {
   return (
@@ -49,6 +50,7 @@ const App = () => {
           <Route element={<PrivateRoute allowedRoles={["user"]} />}>
             <Route path="/home" element={<OrderFood  />} />
             <Route path="/cart" element={<OrderFood />} />
+            <Route path="/bulk-order" element={<BulkOrderForm />} />
             {/* <Route path="/cart" element={<OrderFood />} />
             <Route path="/cart" element={<OrderFood />} />             */}
           </Route>
