@@ -62,7 +62,7 @@ const OrderFood = () => {
   const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
 
-  // Fetch image for vendor logo
+  // Fetch image for vendor logo (async but doesn't block vendor display)
   const fetchImage = async (logoUrl: string) => {
     if (!logoUrl || imageUrls[logoUrl]) return;
 
@@ -85,7 +85,10 @@ const OrderFood = () => {
   };
 
   // Debounce function
-  const debounce = <F extends (...args: any[]) => void>(func: F, wait: number) => {
+  const debounce = <F extends (...args: any[]) => void>(
+    func: F,
+    wait: number
+  ) => {
     let timeout: NodeJS.Timeout;
     return (...args: Parameters<F>) => {
       clearTimeout(timeout);
@@ -131,7 +134,7 @@ const OrderFood = () => {
     [fetchStations]
   );
 
-  // Fetch vendors with proper category handling
+  // Fetch vendors - modified to show cards immediately
   const fetchVendors = async (stationId: number, pageNumber = 1, pageSize = 10) => {
     if (!stationId) return;
     setLoading(true);
@@ -146,15 +149,22 @@ const OrderFood = () => {
 
       const vendorsData = res.data.content || [];
       
-      // Fetch images and categories
-      const vendorsWithData = await Promise.all(
+      // First set vendors with empty categories
+      setVendors(vendorsData.map(vendor => ({
+        ...vendor,
+        categories: []
+      })));
+
+      // Start image loading in background
+      vendorsData.forEach((vendor) => {
+        if (vendor.logoUrl) {
+          fetchImage(vendor.logoUrl);
+        }
+      });
+
+      // Then fetch and update categories
+      const vendorsWithCategories = await Promise.all(
         vendorsData.map(async (vendor) => {
-          // Fetch logo
-          if (vendor.logoUrl) {
-            await fetchImage(vendor.logoUrl);
-          }
-          
-          // Fetch categories
           try {
             const categoriesRes = await api.get<{
               content: Category[];
@@ -170,7 +180,10 @@ const OrderFood = () => {
         })
       );
 
-      setVendors(vendorsWithData);
+      // Update vendors with categories
+      setVendors(vendorsWithCategories);
+
+      // Update pagination
       const { pageable, numberOfElements, totalElements, totalPages } = res.data;
       setPage({
         current_page: pageNumber,
@@ -189,7 +202,7 @@ const OrderFood = () => {
     }
   };
 
-  // Event handlers
+  // Event handlers (keep existing handlers)
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
@@ -225,36 +238,40 @@ const OrderFood = () => {
     };
   }, [imageUrls]);
 
-  // Render star rating
   // Render star rating with half-star support
-const renderStarRating = (rating: number) => {
-  const fullStars = Math.floor(rating);
-  const hasHalfStar = rating % 1 >= 0.5;
-  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+  const renderStarRating = (rating: number) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
 
-  return (
-    <div className="flex items-center">
-      {[...Array(fullStars)].map((_, i) => (
-        <Star key={`full-${i}`} className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-      ))}
-      {hasHalfStar && (
-        <div className="relative w-3 h-3">
-          <Star className="absolute w-3 h-3 fill-gray-300 text-gray-300" />
-          <Star className="absolute w-3 h-3 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />
-        </div>
-      )}
-      {[...Array(emptyStars)].map((_, i) => (
-        <Star key={`empty-${i}`} className="w-3 h-3 fill-gray-300 text-gray-300" />
-      ))}
-    </div>
-  );
-};
+    return (
+      <div className="flex items-center">
+        {[...Array(fullStars)].map((_, i) => (
+          <Star key={`full-${i}`} className="w-3 h-3 fill-yellow-500 text-yellow-500" />
+        ))}
+        {hasHalfStar && (
+          <div className="relative w-3 h-3">
+            <Star className="absolute w-3 h-3 fill-gray-300 text-gray-300" />
+            <Star className="absolute w-3 h-3 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />
+          </div>
+        )}
+        {[...Array(emptyStars)].map((_, i) => (
+          <Star key={`empty-${i}`} className="w-3 h-3 fill-gray-300 text-gray-300" />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <div className="flex-1 p-4 md:p-6">
         {/* Header */}
-  
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">Order Food</h1>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-purple-600 text-white flex items-center justify-center rounded-full">U</div>
+          </div>
+        </div>
 
         {/* Search Section */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
@@ -297,7 +314,7 @@ const renderStarRating = (rating: number) => {
           </div>
         </div>
 
-        {/* Vendor Cards */}
+        {/* Vendor Cards - Now shows immediately */}
         {vendors.length > 0 && (
           <div className="mb-4">
             <div className="flex justify-end mb-4">
@@ -322,6 +339,7 @@ const renderStarRating = (rating: number) => {
                   onClick={() => navigate(`/vendor-detail/${vendor.vendorId}`)}
                 >
                   <div className="flex flex-col sm:flex-row">
+                    {/* Image will load when ready */}
                     <div className="relative w-full sm:w-1/3 h-32 sm:h-auto">
                       {vendor.logoUrl && imageUrls[vendor.logoUrl] ? (
                         <img
@@ -331,7 +349,7 @@ const renderStarRating = (rating: number) => {
                         />
                       ) : (
                         <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
-                          No Image
+                          {vendor.logoUrl ? "Loading..." : "No Image"}
                         </div>
                       )}
                     </div>
@@ -360,9 +378,9 @@ const renderStarRating = (rating: number) => {
                             <span className="font-medium">FSSAI:</span> {vendor.fssaiLicense}
                           </div>
                           <div className="flex items-center gap-1">
-  <span className="font-medium">Rating:</span>
-  {renderStarRating(vendor.rating || 0)}
-</div>
+                            <span className="font-medium">Rating:</span>
+                            {renderStarRating(vendor.rating || 0)}
+                          </div>
                           <div>
                             <Clock className="w-3 h-3 text-gray-500 inline mr-1" />
                             {vendor.preparationTimeMin || 0} min
@@ -374,7 +392,7 @@ const renderStarRating = (rating: number) => {
                             <span className="font-medium">Cuisines:</span>{" "}
                             {vendor.categories?.length ? 
                               vendor.categories.map(c => c.categoryName).join(", ") : 
-                              "No cuisines available"}
+                              "Loading cuisines..."}
                           </div>
                         </div>
                       </div>
