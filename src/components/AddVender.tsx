@@ -18,6 +18,7 @@ import {
   Avatar,
   CircularProgress,
 } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -113,6 +114,7 @@ export default function AddVendor({
   const [logoUrlPreview, setLogoUrlPreview] = useState<string | null>(null);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [stationsList, setStationsList] = useState<Station[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     handleSubmit,
@@ -145,8 +147,12 @@ export default function AddVendor({
 
   const handleClose = () => {
     setId(null);
+    if (logoUrlPreview) {
+      URL.revokeObjectURL(logoUrlPreview); // Clean up any existing preview URL
+    }
     setLogoUrlPreview(null);
     setUploadedFileUrl(null);
+    setShowPassword(false);
     reset();
     setOpen(false);
   };
@@ -176,11 +182,22 @@ export default function AddVendor({
           const res = await api.get(`/vendors/${id}`);
           if (res.status === 200 && res.data) {
             const fileUrl = res.data.logoUrl;
-            const logoUrl = fileUrl
-              ? `/file/download?systemFileName=${fileUrl}`
-              : null;
             setUploadedFileUrl(fileUrl || null);
-            setLogoUrlPreview(logoUrl);
+            if (fileUrl) {
+              // Fetch the image as a blob for preview
+              const response = await api.get(
+                `/files/download?systemFileName=${fileUrl}`,
+                { responseType: "blob" }
+              );
+              if (response.status === 200) {
+                const blobUrl = URL.createObjectURL(response.data);
+                setLogoUrlPreview(blobUrl);
+              } else {
+                setLogoUrlPreview(null);
+              }
+            } else {
+              setLogoUrlPreview(null);
+            }
             reset({
               email: res.data.email || "",
               username: res.data.username || "",
@@ -202,6 +219,7 @@ export default function AddVendor({
           }
         } catch (error) {
           console.error("Error fetching vendor data:", error);
+          setLogoUrlPreview(null);
         } finally {
           setIsLoading(false);
         }
@@ -210,21 +228,14 @@ export default function AddVendor({
     fetchVendorData();
   }, [id, mode, reset]);
 
-  // Retry loading the image if uploadedFileUrl is set but logoUrlPreview is not
   useEffect(() => {
-    if (uploadedFileUrl && !logoUrlPreview) {
-      const apiPreviewUrl = `/file/download?systemFileName=${uploadedFileUrl}`;
-      const img = new Image();
-      img.src = apiPreviewUrl;
-      img.onload = () => {
-        setLogoUrlPreview(apiPreviewUrl);
-      };
-      img.onerror = () => {
-        console.error("Failed to load image from API:", apiPreviewUrl);
-        setLogoUrlPreview(null);
-      };
-    }
-  }, [uploadedFileUrl, logoUrlPreview]);
+    return () => {
+      // Clean up blob URLs on component unmount
+      if (logoUrlPreview) {
+        URL.revokeObjectURL(logoUrlPreview);
+      }
+    };
+  }, [logoUrlPreview]);
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setIsLoading(true);
@@ -259,47 +270,60 @@ export default function AddVendor({
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const tempPreview = URL.createObjectURL(file);
-      setLogoUrlPreview(tempPreview);
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        const resp = await api.post("/files/upload", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-
-        if (resp.status === 200 && resp.data.fileUrl) {
-          const fileUrl = resp.data.fileUrl;
-          onChange(fileUrl);
-          setValue("logoUrl", fileUrl, { shouldDirty: true });
-          setUploadedFileUrl(fileUrl);
-
-          const apiPreviewUrl = `/file/download?systemFileName=${fileUrl}`;
-          const img = new Image();
-          img.src = apiPreviewUrl;
-          img.onload = () => {
-            setLogoUrlPreview(apiPreviewUrl);
-            URL.revokeObjectURL(tempPreview); // Clean up temporary URL
-          };
-          img.onerror = () => {
-            console.error("Failed to load image from API:", apiPreviewUrl);
-            setLogoUrlPreview(null); // Clear preview if API fails
-          };
-        } else {
-          setLogoUrlPreview(null);
-          setUploadedFileUrl(null);
-        }
-      } catch (error) {
-        console.error("Error uploading file:", error);
-        setLogoUrlPreview(null);
-        setUploadedFileUrl(null);
-      }
-    } else {
+    if (!file) {
       setLogoUrlPreview(null);
       setUploadedFileUrl(null);
+      onChange("");
+      return;
+    }
+
+    // Set temporary preview
+    const tempPreview = URL.createObjectURL(file);
+    setLogoUrlPreview(tempPreview);
+
+    try {
+      // Upload file
+      const formData = new FormData();
+      formData.append("file", file);
+      const resp = await api.post("/files/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (resp.status === 200 && resp.data.fileUrl) {
+        const fileUrl = resp.data.fileUrl;
+        onChange(fileUrl);
+        setValue("logoUrl", fileUrl, { shouldDirty: true });
+        setUploadedFileUrl(fileUrl);
+
+        // Fetch the uploaded image as a blob for preview
+        try {
+          const response = await api.get(
+            `/file/download?systemFileName=${fileUrl}`,
+            { responseType: "blob" }
+          );
+          if (response.status === 200) {
+            const blobUrl = URL.createObjectURL(response.data);
+            setLogoUrlPreview(blobUrl);
+            URL.revokeObjectURL(tempPreview); // Clean up temporary preview
+          } else {
+            console.error("Failed to fetch uploaded image for preview");
+            setLogoUrlPreview(tempPreview); // Fallback to temp preview
+          }
+        } catch (fetchError) {
+          console.error("Error fetching image blob:", fetchError);
+          setLogoUrlPreview(tempPreview); // Fallback to temp preview
+        }
+      } else {
+        console.error("Invalid upload response");
+        setLogoUrlPreview(tempPreview); // Fallback to temp preview
+        setUploadedFileUrl(null);
+        onChange("");
+      }
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      setLogoUrlPreview(tempPreview); // Fallback to temp preview
+      setUploadedFileUrl(null);
+      onChange("");
     }
   };
 
@@ -308,6 +332,10 @@ export default function AddVendor({
     event: SelectChangeEvent<number>
   ) => {
     onChange(Number(event.target.value));
+  };
+
+  const handleTogglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
   };
 
   return (
@@ -477,12 +505,22 @@ export default function AddVendor({
                     <TextField
                       {...field}
                       label="Password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       variant="outlined"
                       fullWidth
                       error={!!errors.password}
                       helperText={errors.password?.message}
                       size="small"
+                      InputProps={{
+                        endAdornment: (
+                          <IconButton
+                            onClick={handleTogglePasswordVisibility}
+                            edge="end"
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        ),
+                      }}
                     />
                   )}
                 />
@@ -629,12 +667,14 @@ export default function AddVendor({
                           accept="image/*"
                           onChange={(e) => handleFileChange(field.onChange, e)}
                           style={{ display: "none" }}
+                          disabled={isLoading} // Disable during upload
                         />
                         <Button
                           variant="outlined"
                           component="span"
                           size="small"
                           sx={{ textTransform: "none" }}
+                          disabled={isLoading}
                         >
                           Choose File
                         </Button>
@@ -775,13 +815,13 @@ export default function AddVendor({
                   control={control}
                   render={({ field }) => (
                     <FormControlLabel
-                      control={
+                      control={(
                         <Checkbox
                           checked={field.value}
                           onChange={(e) => field.onChange(e.target.checked)}
                           color="primary"
                         />
-                      }
+                      )}
                       label="Active Vendor"
                       sx={{ mt: 1 }}
                     />
@@ -795,13 +835,13 @@ export default function AddVendor({
                   control={control}
                   render={({ field }) => (
                     <FormControlLabel
-                      control={
+                      control={(
                         <Checkbox
                           checked={field.value}
                           onChange={(e) => field.onChange(e.target.checked)}
                           color="primary"
                         />
-                      }
+                      )}
                       label="Vegetarian Only"
                       sx={{ mt: 1 }}
                     />
@@ -826,6 +866,7 @@ export default function AddVendor({
               variant="outlined"
               onClick={handleClose}
               sx={{ minWidth: 100 }}
+              disabled={isLoading}
             >
               Cancel
             </Button>

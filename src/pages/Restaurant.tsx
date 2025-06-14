@@ -60,14 +60,20 @@ const Restaurant: FC = () => {
   };
 
   const handleDelete = async () => {
+    if (!selectedId) return;
     try {
       setLoading(true);
       const res = await api.delete(`/vendors/${selectedId}`);
-      if (res.status === 200) {
-        setRefresh(!refresh);
+      if (res.status === 204) { // Changed from 200 to 204
+        setRefresh(!refresh); // Trigger list refresh
+        handleClose(); // Close the modal
+        alert("Vendor deleted successfully!"); // Replace with toast notification if available
+      } else {
+        throw new Error(`Unexpected status code: ${res.status}`);
       }
     } catch (error) {
-      console.error("Failed to delete data:", error);
+      console.error("Failed to delete vendor:", error);
+      alert("Failed to delete vendor. Please try again."); // Replace with toast notification
     } finally {
       setLoading(false);
     }
@@ -76,11 +82,8 @@ const Restaurant: FC = () => {
   const fetchImage = async (logoUrl: string) => {
     if (!logoUrl || imageUrls[logoUrl]) return;
 
-    // Use the full logoUrl as the systemFileName, as expected by the backend
-    const systemFileName = logoUrl; // e.g., a6adfea7-111d-4cae-b66a-7e51d37fc6e9-icons8-machine-100.png
-
+    const systemFileName = logoUrl;
     try {
-      // Make API call to fetch the image blob, sending the full systemFileName
       const response = await api.get(
         `/files/download?systemFileName=${systemFileName}`,
         { responseType: "blob" }
@@ -110,8 +113,6 @@ const Restaurant: FC = () => {
       const vendors = res.data.content || [];
       setListData(vendors);
 
-      // Fetch images for all vendors on the current page
-      // item.logoUrl contains the full systemFileName (e.g., "a6adfea7-111d-4cae-b66a-7e51d37fc6e9-icons8-machine-100.png")
       vendors.forEach((item: any) => {
         if (item.logoUrl) {
           fetchImage(item.logoUrl);
@@ -148,6 +149,7 @@ const Restaurant: FC = () => {
     } catch (error) {
       console.error("Failed to fetch data:", error);
       setListData([]);
+      alert("Failed to fetch vendor data. Please try again."); // Replace with toast
     } finally {
       setLoading(false);
     }
@@ -173,7 +175,7 @@ const Restaurant: FC = () => {
 
   useEffect(() => {
     getData(page.current_page, page.per_page);
-  }, [refresh]);
+  }, [refresh, page.current_page, page.per_page]); // Added page dependencies
 
   // Clean up object URLs on component unmount
   useEffect(() => {
@@ -476,12 +478,14 @@ const Restaurant: FC = () => {
               variant="destructive"
               onClick={handleDelete}
               className="w-full sm:w-auto px-4 py-2"
+              disabled={loading} // Disable button during loading
             >
               Yes, Delete
             </Button>
             <Button
               className="w-full sm:w-auto px-4 py-2 bg-gray-600"
               onClick={handleClose}
+              disabled={loading} // Disable button during loading
             >
               No
             </Button>
