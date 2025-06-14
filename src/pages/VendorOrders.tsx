@@ -113,20 +113,20 @@ const statusColors = {
   PENDING: "bg-amber-100 text-amber-800",
   PREPARING: "bg-blue-100 text-blue-800",
   DELIVERED: "bg-green-100 text-green-800",
-  CANCELLED: "bg-red-100 text-red-800"
+  CANCELLED: "bg-red-100 text-red-800",
 };
 
 const paymentColors = {
   PAID: "bg-green-100 text-green-800",
   PENDING: "bg-amber-100 text-amber-800",
-  FAILED: "bg-red-100 text-red-800"
+  FAILED: "bg-red-100 text-red-800",
 };
 
 const paymentMethodIcons = {
   COD: <MdPayment className="text-red-500" title="Cash on Delivery" />,
   UPI: <MdPayment className="text-blue-500" title="UPI Payment" />,
   CARD: <MdPayment className="text-purple-500" title="Card Payment" />,
-  NETBANKING: <MdPayment className="text-green-500" title="Net Banking" />
+  NETBANKING: <MdPayment className="text-green-500" title="Net Banking" />,
 };
 
 const VendorOrders: React.FC = () => {
@@ -135,16 +135,19 @@ const VendorOrders: React.FC = () => {
   const [historyFilter, setHistoryFilter] = useState<"ALL" | "DELIVERED" | "CANCELLED">("ALL");
 
   if (!vendorId) {
-    return <div className="p-4 text-center text-red-500 text-sm sm:text-base">Please login as vendor</div>;
+    return (
+      <div className="p-4 text-center text-red-500 text-sm md:text-base">
+        Please login as vendor
+      </div>
+    );
   }
 
-  const vendorOrders = mockOrders.filter(order => order.vendorId === vendorId);
-  const activeOrders = vendorOrders.filter(order => 
+  const vendorOrders = mockOrders.filter((order) => order.vendorId === vendorId);
+  const activeOrders = vendorOrders.filter((order) =>
     ["PENDING", "PREPARING"].includes(order.orderStatus)
   );
-  
-  const filteredOrderHistory = vendorOrders.filter(order => 
-    historyFilter === "ALL" 
+  const filteredOrderHistory = vendorOrders.filter((order) =>
+    historyFilter === "ALL"
       ? ["DELIVERED", "CANCELLED"].includes(order.orderStatus)
       : order.orderStatus === historyFilter
   );
@@ -154,98 +157,127 @@ const VendorOrders: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-full sm:max-w-4xl lg:max-w-7xl mx-auto space-y-6 sm:space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-full mx-auto space-y-6 md:space-y-8">
       {/* Active Orders Section */}
-      <section className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800">Active Orders ({activeOrders.length})</h2>
+      <section className="space-y-4 md:space-y-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-800">
+            Active Orders ({activeOrders.length})
+          </h2>
           <div className="flex flex-wrap gap-2">
-            <span className={`px-2 py-1 rounded-full text-xs sm:text-sm ${statusColors.PENDING}`}>
-              Pending: {vendorOrders.filter(o => o.orderStatus === "PENDING").length}
+            <span
+              className={`px-2 py-1 rounded-full text-xs md:text-sm ${statusColors.PENDING}`}
+            >
+              Pending: {vendorOrders.filter((o) => o.orderStatus === "PENDING").length}
             </span>
-            <span className={`px-2 py-1 rounded-full text-xs sm:text-sm ${statusColors.PREPARING}`}>
-              Preparing: {vendorOrders.filter(o => o.orderStatus === "PREPARING").length}
+            <span
+              className={`px-2 py-1 rounded-full text-xs md:text-sm ${statusColors.PREPARING}`}
+            >
+              Preparing: {vendorOrders.filter((o) => o.orderStatus === "PREPARING").length}
             </span>
           </div>
         </div>
 
         {activeOrders.length === 0 ? (
           <div className="text-center py-8 bg-white rounded-lg shadow">
-            <p className="text-gray-500 text-sm sm:text-base">No active orders currently</p>
+            <p className="text-gray-500 text-sm md:text-base">No active orders currently</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {activeOrders.map(order => (
-              <div key={order.orderId} className="bg-white rounded-lg shadow-md overflow-hidden border-l-4 border-blue-500">
-                <div className="p-4 sm:p-6">
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
-                    <div>
-                      <h3 className="font-medium text-gray-900 text-sm sm:text-base">Order #{order.orderId}</h3>
-                      <div className="flex items-center mt-1 text-xs sm:text-sm text-gray-600">
-                        <FaTrain className="mr-1" />
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {activeOrders.map((order) => (
+              <div
+                key={order.orderId}
+                className="bg-white rounded-lg shadow-md overflow-hidden border-l-4 border-blue-500"
+              >
+                <div className="p-4 sm:p-5">
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 text-sm md:text-base">
+                        Order #{order.orderId}
+                      </h3>
+                      <div className="flex items-center mt-1 text-xs md:text-sm text-gray-600">
+                        <FaTrain className="mr-1 flex-shrink-0" />
                         <span>Train {order.trainId}</span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end">
-                      <span className={`px-2 py-1 rounded-full text-xs sm:text-sm ${statusColors[order.orderStatus]}`}>
+                    <div className="flex flex-col items-end space-y-1 min-w-[100px]">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs md:text-sm ${statusColors[order.orderStatus]}`}
+                      >
                         {order.orderStatus}
                       </span>
-                      <div className="mt-1 flex items-center">
+                      <div className="flex items-center">
                         {paymentMethodIcons[order.paymentMethod]}
-                        <span className="ml-1 text-xs sm:text-sm">{order.paymentMethod}</span>
+                        <span className="ml-1 text-xs md:text-sm">
+                          {order.paymentMethod}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div className="mt-3 flex justify-between items-center gap-2">
                     <div className="flex items-center">
-                      <FaChair className="mr-1 text-gray-500" />
-                      <span className="text-xs sm:text-sm text-gray-600">
+                      <FaChair className="mr-1 text-gray-500 flex-shrink-0" />
+                      <span className="text-xs md:text-sm text-gray-600">
                         {order.coachNumber}/{order.seatNumber}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs sm:text-sm text-gray-500">
-                        {new Date(order.deliveryTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      <span className="text-xs md:text-sm text-gray-500">
+                        {new Date(order.deliveryTime).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
-                      <span className="font-semibold text-sm sm:text-base">₹{order.finalAmount.toFixed(2)}</span>
+                      <span className="font-semibold text-sm md:text-base">
+                        ₹{order.finalAmount.toFixed(2)}
+                      </span>
                     </div>
                   </div>
 
                   <button
                     onClick={() => toggleOrderDetails(order.orderId)}
-                    className="mt-3 sm:mt-4 w-full py-1.5 text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center justify-center"
+                    className="mt-3 w-full py-1.5 text-xs md:text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center justify-center"
                   >
                     {expandedOrderId === order.orderId ? "Hide details" : "Show details"}
                   </button>
 
                   {expandedOrderId === order.orderId && (
-                    <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200 space-y-2 sm:space-y-3">
-                      <div className="flex justify-between text-xs sm:text-sm">
+                    <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+                      <div className="flex justify-between text-xs md:text-sm">
                         <span className="text-gray-500">PNR:</span>
                         <span className="font-medium">{order.pnrNumber}</span>
                       </div>
-                      <div className="flex justify-between text-xs sm:text-sm">
+                      <div className="flex justify-between text-xs md:text-sm">
                         <span className="text-gray-500">Payment Status:</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs sm:text-sm ${paymentColors[order.paymentStatus]}`}>
+                        <span
+                          className={`px-2 py-0.5 rounded-full ${paymentColors[order.paymentStatus]}`}
+                        >
                           {order.paymentStatus}
                         </span>
                       </div>
                       {order.deliveryInstructions && (
-                        <div className="text-xs sm:text-sm">
+                        <div className="text-xs md:text-sm">
                           <p className="text-gray-500">Instructions:</p>
                           <p className="italic">{order.deliveryInstructions}</p>
                         </div>
                       )}
                       <div className="pt-2">
-                        <h4 className="text-xs sm:text-sm font-medium text-gray-700">Items:</h4>
+                        <h4 className="text-xs md:text-sm font-medium text-gray-700">
+                          Items:
+                        </h4>
                         <ul className="space-y-1 mt-1">
-                          {order.items.map(item => (
-                            <li key={item.itemId} className="flex justify-between text-xs sm:text-sm">
+                          {order.items.map((item) => (
+                            <li
+                              key={item.itemId}
+                              className="flex justify-between text-xs md:text-sm"
+                            >
                               <span>
                                 {item.itemName} × {item.quantity}
                                 {item.specialInstructions && (
-                                  <span className="text-xs text-gray-500 ml-1">({item.specialInstructions})</span>
+                                  <span className="text-xs text-gray-500 ml-1">
+                                    ({item.specialInstructions})
+                                  </span>
                                 )}
                               </span>
                               <span>₹{(item.quantity * item.unitPrice).toFixed(2)}</span>
@@ -263,25 +295,39 @@ const VendorOrders: React.FC = () => {
       </section>
 
       {/* Order History Section */}
-      <section className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800">Order History</h2>
+      <section className="space-y-4 md:space-y-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-800">
+            Order History
+          </h2>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setHistoryFilter("ALL")}
-              className={`px-3 py-1 text-xs sm:text-sm rounded-full ${historyFilter === "ALL" ? "bg-gray-800 text-white" : "bg-gray-200 text-gray-700"}`}
+              className={`px-3 py-1 text-xs md:text-sm rounded-full ${
+                historyFilter === "ALL"
+                  ? "bg-gray-800 text-white"
+                  : "bg-gray-200 text-gray-700"
+              }`}
             >
               All
             </button>
             <button
               onClick={() => setHistoryFilter("DELIVERED")}
-              className={`px-3 py-1 text-xs sm:text-sm rounded-full ${historyFilter === "DELIVERED" ? "bg-green-600 text-white" : "bg-gray-200 text-gray-700"}`}
+              className={`px-3 py-1 text-xs md:text-sm rounded-full ${
+                historyFilter === "DELIVERED"
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-200 text-gray-700"
+              }`}
             >
               Delivered
             </button>
             <button
               onClick={() => setHistoryFilter("CANCELLED")}
-              className={`px-3 py-1 text-xs sm:text-sm rounded-full ${historyFilter === "CANCELLED" ? "bg-red-600 text-white" : "bg-gray-200 text-gray-700"}`}
+              className={`px-3 py-1 text-xs md:text-sm rounded-full ${
+                historyFilter === "CANCELLED"
+                  ? "bg-red-600 text-white"
+                  : "bg-gray-200 text-gray-700"
+              }`}
             >
               Cancelled
             </button>
@@ -290,7 +336,7 @@ const VendorOrders: React.FC = () => {
 
         {filteredOrderHistory.length === 0 ? (
           <div className="text-center py-8 bg-white rounded-lg shadow">
-            <p className="text-gray-500 text-sm sm:text-base">No orders found</p>
+            <p className="text-gray-500 text-sm md:text-base">No orders found</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -298,55 +344,81 @@ const VendorOrders: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Train</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Seat</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                    <th className="px-3 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Order ID
+                    </th>
+                    <th className="px-3 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Train
+                    </th>
+                    <th className="px-3 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Seat
+                    </th>
+                    <th className="px-3 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-3 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-3 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Payment
+                    </th>
+                    <th className="px-3 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Method
+                    </th>
+                    <th className="px-3 py-2 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Details
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredOrderHistory.map(order => (
+                  {filteredOrderHistory.map((order) => (
                     <tr key={order.orderId}>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">#{order.orderId}</td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                      <td className="px-3 py-2 md:py-3 whitespace-nowrap text-xs md:text-sm font-medium text-gray-900">
+                        #{order.orderId}
+                      </td>
+                      <td className="px-3 py-2 md:py-3 whitespace-nowrap text-xs md:text-sm text-gray-500">
                         <div className="flex items-center">
-                          <FaTrain className="mr-1" />
+                          <FaTrain className="mr-1 flex-shrink-0" />
                           {order.trainId}
                         </div>
                       </td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                      <td className="px-3 py-2 md:py-3 whitespace-nowrap text-xs md:text-sm text-gray-500">
                         <div className="flex items-center">
-                          <FaChair className="mr-1" />
+                          <FaChair className="mr-1 flex-shrink-0" />
                           {order.coachNumber}/{order.seatNumber}
                         </div>
                       </td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs sm:text-sm ${statusColors[order.orderStatus]}`}>
+                      <td className="px-3 py-2 md:py-3 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs md:text-sm ${statusColors[order.orderStatus]}`}
+                        >
                           {order.orderStatus}
                         </span>
                       </td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-500">₹{order.finalAmount.toFixed(2)}</td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs sm:text-sm ${paymentColors[order.paymentStatus]}`}>
+                      <td className="px-3 py-2 md:py-3 whitespace-nowrap text-xs md:text-sm text-gray-500">
+                        ₹{order.finalAmount.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 md:py-3 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs md:text-sm ${paymentColors[order.paymentStatus]}`}
+                        >
                           {order.paymentStatus}
                         </span>
                       </td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                      <td className="px-3 py-2 md:py-3 whitespace-nowrap">
                         <div className="flex items-center">
                           {paymentMethodIcons[order.paymentMethod]}
-                          <span className="ml-1 text-xs sm:text-sm">{order.paymentMethod}</span>
+                          <span className="ml-1 text-xs md:text-sm">
+                            {order.paymentMethod}
+                          </span>
                         </div>
                       </td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
+                      <td className="px-3 py-2 md:py-3 whitespace-nowrap text-xs md:text-sm font-medium">
                         <button
                           onClick={() => toggleOrderDetails(order.orderId)}
                           className="text-blue-600 hover:text-blue-900"
                         >
-                          {expandedOrderId === order.orderId ? 'Hide' : 'View'}
+                          {expandedOrderId === order.orderId ? "Hide" : "View"}
                         </button>
                       </td>
                     </tr>
@@ -356,13 +428,18 @@ const VendorOrders: React.FC = () => {
             </div>
 
             {/* Expanded order details */}
-            {filteredOrderHistory.map(order => (
+            {filteredOrderHistory.map((order) => (
               expandedOrderId === order.orderId && (
-                <div key={`details-${order.orderId}`} className="px-4 sm:px-6 py-4 sm:py-6 bg-gray-50 border-t border-gray-200">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div
+                  key={`details-${order.orderId}`}
+                  className="px-4 py-4 md:py-6 bg-gray-50 border-t border-gray-200"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                     <div>
-                      <h4 className="font-medium text-gray-700 text-sm sm:text-base mb-2 sm:mb-3">Delivery Information</h4>
-                      <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-600">
+                      <h4 className="font-medium text-gray-700 text-sm md:text-base mb-3">
+                        Delivery Information
+                      </h4>
+                      <div className="space-y-3 text-xs md:text-sm text-gray-600">
                         <div className="flex justify-between">
                           <span className="text-gray-500">PNR:</span>
                           <span>{order.pnrNumber}</span>
@@ -373,29 +450,41 @@ const VendorOrders: React.FC = () => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">Delivery Time:</span>
-                          <span>{new Date(order.deliveryTime).toLocaleString()}</span>
+                          <span>
+                            {new Date(order.deliveryTime).toLocaleString()}
+                          </span>
                         </div>
                         {order.deliveryInstructions && (
                           <div className="flex justify-between">
                             <span className="text-gray-500">Instructions:</span>
-                            <span className="italic max-w-[70%]">{order.deliveryInstructions}</span>
+                            <span className="italic">
+                              {order.deliveryInstructions}
+                            </span>
                           </div>
                         )}
                       </div>
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-700 text-sm sm:text-base mb-2 sm:mb-3">Order Items</h4>
-                      <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
-                        {order.items.map(item => (
+                      <h4 className="font-medium text-gray-700 text-sm md:text-base mb-3">
+                        Order Items
+                      </h4>
+                      <ul className="space-y-3 text-xs md:text-sm">
+                        {order.items.map((item) => (
                           <li key={item.itemId}>
                             <div className="flex justify-between">
-                              <span className="font-medium">{item.itemName}</span>
+                              <span className="font-medium">
+                                {item.itemName}
+                              </span>
                               <span>₹{(item.quantity * item.unitPrice).toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-gray-500">
-                              <span>{item.quantity} x ₹{item.unitPrice.toFixed(2)}</span>
+                              <span>
+                                {item.quantity} x ₹{item.unitPrice.toFixed(2)}
+                              </span>
                               {item.specialInstructions && (
-                                <span className="italic max-w-[50%]">{item.specialInstructions}</span>
+                                <span className="italic">
+                                  {item.specialInstructions}
+                                </span>
                               )}
                             </div>
                           </li>

@@ -1,20 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Search, Star } from "lucide-react";
+import { Search, Star, Clock, Sprout, Drumstick } from "lucide-react";
 import api from "@/utils/axios";
 import LoaderModal from "@/components/LoaderModal";
 import Pagination from "@/components/Pagination";
 
+// Define interfaces
 interface Station {
   stationId: number;
   stationCode: string;
@@ -34,12 +27,23 @@ interface Vendor {
   address: string;
 }
 
+interface PaginationData {
+  current_page: number;
+  to: number;
+  total: number;
+  from: number;
+  per_page: number;
+  remainingPages: number;
+  last_page: number;
+}
+
 const OrderFood = () => {
-  const [selectedStation, setSelectedStation] = useState<string>("");
+  const [searchType, setSearchType] = useState<"stationCode" | "city">("city");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [stations, setStations] = useState<Station[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [page, setPage] = useState({
+  const [page, setPage] = useState<PaginationData>({
     current_page: 1,
     to: 0,
     total: 0,
@@ -55,7 +59,7 @@ const OrderFood = () => {
     const fetchStations = async () => {
       setLoading(true);
       try {
-        const res = await api.get("/stations/all");
+        const res = await api.get<{ data: Station[] }>("/api/stations/all");
         if (Array.isArray(res.data)) {
           setStations(res.data);
         } else {
@@ -70,12 +74,19 @@ const OrderFood = () => {
     fetchStations();
   }, []);
 
-  // Fetch vendors when station is selected or page/per_page changes
-  const fetchVendors = async (stationId: string, pageNumber = 1, pageSize = 10) => {
+  // Fetch vendors when searchQuery or page changes
+  const fetchVendors = async (stationId: number, pageNumber = 1, pageSize = 10) => {
     if (!stationId) return;
     setLoading(true);
     try {
-      const res = await api.get(`/vendors/stations/${stationId}?page=${pageNumber - 1}&size=${pageSize}`);
+      const res = await api.get<{
+        content: Vendor[];
+        pageable: { offset: number; pageSize: number };
+        numberOfElements: number;
+        totalElements: number;
+        totalPages: number;
+      }>(`/vendors/stations/${stationId}?page=${pageNumber - 1}&size=${pageSize}`);
+      
       setVendors(res.data.content || []);
       const { pageable, numberOfElements, totalElements, totalPages } = res.data;
       setPage({
@@ -95,24 +106,35 @@ const OrderFood = () => {
     }
   };
 
-  // Handle station selection
-  const handleStationChange = (value: string) => {
-    setSelectedStation(value);
-    setPage((prev) => ({ ...prev, current_page: 1 }));
-    if (value) {
-      fetchVendors(value, 1, page.per_page);
+  // Handle search
+  const handleSearch = () => {
+    const station = stations.find((s: Station) =>
+      searchType === "stationCode"
+        ? s.stationCode.toLowerCase() === searchQuery.toLowerCase()
+        : s.stationName.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (station) {
+      setPage((prev) => ({ ...prev, current_page: 1 }));
+      fetchVendors(station.stationId, 1, page.per_page);
     } else {
       setVendors([]);
     }
   };
 
   // Handle pagination
-  const handlePageClick = (e: any) => {
+  const handlePageClick = (e: { selected: number }) => {
     if (!loading) {
       const newPage = e.selected + 1;
       if (newPage !== page.current_page) {
         setPage((prev) => ({ ...prev, current_page: newPage }));
-        fetchVendors(selectedStation, newPage, page.per_page);
+        const station = stations.find((s: Station) =>
+          searchType === "stationCode"
+            ? s.stationCode.toLowerCase() === searchQuery.toLowerCase()
+            : s.stationName.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        if (station) {
+          fetchVendors(station.stationId, newPage, page.per_page);
+        }
       }
     }
   };
@@ -120,109 +142,130 @@ const OrderFood = () => {
   // Handle page size change
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSize = parseInt(e.target.value, 10);
-    if (newSize !== page.per_page) {
-      setPage((prev) => ({ ...prev, per_page: newSize, current_page: 1 }));
-      fetchVendors(selectedStation, 1, newSize);
+    setPage((prev) => ({ ...prev, per_page: newSize, current_page: 1 }));
+    const station = stations.find((s: Station) =>
+      searchType === "stationCode"
+        ? s.stationCode.toLowerCase() === searchQuery.toLowerCase()
+        : s.stationName.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (station) {
+      fetchVendors(station.stationId, 1, newSize);
     }
   };
 
   return (
-    <div className="w-full min-h-screen flex flex-col items-center justify-start bg-white">
-      {loading && <LoaderModal />}
-      <div className="w-full max-w-5xl mt-10 px-4 sm:px-8">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-8">
-          <div className="w-full sm:w-1/2 flex flex-col items-center sm:items-start space-y-4">
-            <Label htmlFor="station" className="text-lg font-medium">
-              Select Station Name
-            </Label>
-            <div className="relative w-full max-w-sm">
-              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                <Search className="size-5 text-gray-400" />
-              </div>
-              <Select onValueChange={handleStationChange} value={selectedStation}>
-                <SelectTrigger className="w-full pl-10 pr-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                  <SelectValue placeholder="Select Station Name" />
-                </SelectTrigger>
-                <SelectContent className="bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {stations.map((station) => (
-                    <SelectItem
-                      key={station.stationId}
-                      value={station.stationId.toString()}
-                      className="px-4 py-2 text-sm text-gray-900 hover:bg-blue-50 cursor-pointer"
-                    >
-                      {station.stationName} ({station.stationCode})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+    <div className="flex min-h-screen bg-gray-100">
+      {/* Main Content */}
+      <div className="flex-1 p-4 md:p-6">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-2">
+            <button className="md:hidden">
+              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+              </svg>
+            </button>
+            <h1 className="text-xl md:text-2xl font-semibold text-gray-800">Orders</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Hi, undefined</span>
+            <div className="w-8 h-8 bg-purple-600 text-white flex items-center justify-center rounded-full">U</div>
+          </div>
+        </div>
+
+        {/* Search Section */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+          <div className="w-full sm:w-2/3 flex flex-col space-y-4">
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setSearchType("stationCode")}
+                className={`px-4 py-2 rounded-full text-sm ${searchType === "stationCode" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"}`}
+              >
+                Station Code
+              </Button>
+              <Button
+                onClick={() => setSearchType("city")}
+                className={`px-4 py-2 rounded-full text-sm ${searchType === "city" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"}`}
+              >
+                City
+              </Button>
+            </div>
+            <div className="relative w-full max-w-md">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={`Enter ${searchType === "stationCode" ? "Station Code" : "City"}`}
+                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500"
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-5 text-gray-400" />
+              <Button onClick={handleSearch} className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white hover:bg-blue-700 rounded-full px-4 py-1 text-sm">
+                Search
+              </Button>
             </div>
           </div>
-          <div className="w-full sm:w-1/2 flex justify-center sm:justify-end">
+          <div className="w-full sm:w-1/3 flex justify-center sm:justify-end">
             <img
               src="https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=2070&auto=format&fit=crop"
               alt="Food Banner"
-              className="w-full max-w-xs h-32 object-cover rounded-lg"
+              className="w-full max-w-xs h-24 sm:h-32 object-cover rounded-lg shadow-md"
             />
           </div>
         </div>
 
-        {selectedStation && vendors.length > 0 && (
+        {/* Vendor Cards */}
+        {vendors.length > 0 && (
           <div className="mb-4">
             <div className="flex justify-end mb-4">
               <select
                 value={page.per_page}
                 onChange={handlePageSizeChange}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="border border-gray-300 rounded-full px-3 py-1 text-sm text-gray-600"
               >
-                <option value={10}>10 Records Per Page</option>
-                <option value={25}>25 Records Per Page</option>
-                <option value={50}>50 Records Per Page</option>
+                <option value={10}>10 Records</option>
+                <option value={25}>25 Records</option>
+                <option value={50}>50 Records</option>
               </select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {vendors.map((vendor) => (
-                <Card key={vendor.vendorId} className="shadow-lg rounded-lg overflow-hidden">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      {vendor.logoUrl ? (
-                        <img
-                          src={vendor.logoUrl}
-                          alt="Vendor Logo"
-                          className="w-16 h-16 object-cover rounded-full"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-                          <span className="text-gray-500 text-sm">No Logo</span>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-800">
-                          {vendor.businessName}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">{vendor.address}</p>
-                        <div className="flex flex-wrap gap-2 mt-2 text-sm text-gray-600">
-                          <span
-                            className={`px-2 py-1 rounded-md ${
-                              vendor.veg ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                            }`}
-                          >
-                            {vendor.veg ? "Veg" : "Non-Veg"}
-                          </span>
-                          <span className="px-2 py-1 bg-gray-100 rounded-md">
-                            Prep: {vendor.preparationTimeMin} min
-                          </span>
-                          <span className="flex items-center px-2 py-1 bg-yellow-100 rounded-md">
-                            <Star className="w-4 h-4 text-yellow-500 mr-1" />
-                            {vendor.rating.toFixed(1)}
-                          </span>
-                        </div>
-                        <Button
-                          onClick={() => navigate(`/vender-detail/${vendor.vendorId}`)}
-                          className="mt-4 bg-blue-600 text-white hover:bg-blue-700 rounded-lg px-4 py-2"
-                        >
-                          Order Now
-                        </Button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {vendors.map((vendor: Vendor) => (
+                <Card
+                  key={vendor.vendorId}
+                  className="shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer"
+                  onClick={() => navigate(`/vendor-detail/${vendor.vendorId}`)}
+                >
+                  <CardContent className="p-4 flex items-start gap-3">
+                    {vendor.logoUrl ? (
+                      <img
+                        src={vendor.logoUrl}
+                        alt="Vendor Logo"
+                        className="w-16 h-16 object-cover rounded-full border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                        <span className="text-gray-500 text-xs">Logo</span>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-800">{vendor.businessName}</h3>
+                      <div className="flex flex-wrap gap-2 mt-2 text-sm text-gray-600">
+                        <span className="flex items-center gap-1">
+                          {vendor.veg ? (
+                            <Sprout className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Drumstick className="w-4 h-4 text-red-600" />
+                          )}
+                          {vendor.veg ? "Veg" : "Non-Veg"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          Prep: {vendor.preparationTimeMin} min
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Star className="w-4 h-4 text-yellow-500" />
+                          {vendor.rating.toFixed(1)}
+                        </span>
                       </div>
                     </div>
                   </CardContent>
@@ -230,7 +273,10 @@ const OrderFood = () => {
               ))}
             </div>
 
-            <div className="w-full mt-6 flex flex-col items-center">
+            <div className="w-full mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <p className="text-sm text-gray-600">
+                Showing {page.from} to {page.to} of {page.total} results
+              </p>
               <Pagination
                 numOfPages={page.last_page}
                 pageNo={page.current_page}
@@ -240,16 +286,16 @@ const OrderFood = () => {
                 from={page.from}
                 to={page.to}
               />
-              <p className="text-sm text-gray-600 mt-2">
-                Showing {page.from} to {page.to} of {page.total} results
-              </p>
             </div>
           </div>
         )}
 
-        {selectedStation && vendors.length === 0 && !loading && (
+        {searchQuery && vendors.length === 0 && !loading && (
           <div className="flex flex-col items-center justify-center mt-12">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4">No Vendors Found</h2>
+            <h2 className="text-lg font-semibold text-gray-700">No Vendors Found</h2>
+            <p className="text-sm text-gray-500 mt-2">
+              Try a different {searchType === "stationCode" ? "station code" : "city"}.
+            </p>
           </div>
         )}
       </div>
