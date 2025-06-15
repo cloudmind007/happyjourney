@@ -38,7 +38,7 @@ const mockOrders: OrderDTO[] = [
   {
     orderId: 1,
     customerId: 101,
-    vendorId: 12,
+    vendorId: 13,
     trainId: 12345,
     pnrNumber: "PNR123456",
     coachNumber: "B1",
@@ -62,7 +62,7 @@ const mockOrders: OrderDTO[] = [
   {
     orderId: 2,
     customerId: 102,
-    vendorId: 12,
+    vendorId: 13,
     trainId: 12346,
     pnrNumber: "PNR654321",
     coachNumber: "A2",
@@ -86,7 +86,7 @@ const mockOrders: OrderDTO[] = [
   {
     orderId: 3,
     customerId: 103,
-    vendorId: 12,
+    vendorId: 13,
     trainId: 12347,
     pnrNumber: "PNR112233",
     coachNumber: "S3",

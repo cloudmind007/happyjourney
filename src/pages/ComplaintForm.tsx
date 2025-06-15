@@ -47,7 +47,7 @@ const ComplaintForm: React.FC = () => {
           name: "",
           email: "",
           mobileNumber: "",
-          description: "",
+          description: "",    
         });
         setTimeout(() => navigate("/"), 3000);
       }
@@ -218,6 +218,7 @@ const ComplaintForm: React.FC = () => {
             <div className="p-4 bg-red-50 rounded-lg flex items-start">
               <ExclamationCircleIcon className="h-5 w-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
               <div>
+                <h3 className="text-sm font-medium text-red-800">There was an error</h3>
                 <p className="text-sm text-red-700 mt-1">{error}</p>
               </div>
             </div>

@@ -311,7 +311,7 @@ const Restaurant: FC = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => navigate(`/vender-detail/${item.vendorId}`)}
+                                onClick={() => navigate(`/vendor-detail/${item.vendorId}`)}
                                 className="p-2 text-green-600 hover:bg-green-50"
                               >
                                 <Eye className="w-5 h-5" />
@@ -527,7 +527,7 @@ const Restaurant: FC = () => {
               className="w-full sm:w-auto px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white"
               onClick={handleClose}
               disabled={loading}
-            >
+            > 
               No
             </Button>
           </Box>
