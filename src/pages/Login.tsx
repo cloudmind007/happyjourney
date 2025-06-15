@@ -30,7 +30,7 @@ const Login: React.FC = () => {
       });
 
       if (response.status === 200 && response.data.accessToken) {
-        const { accessToken, role, name: username, userId } = response.data;
+        const { accessToken, role, userName: username, userId } = response.data;
         login({
           accessToken,
           role,
