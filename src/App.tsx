@@ -14,7 +14,7 @@ import VendorHome from "./pages/VendorHome";
 import Home from "./pages/Home";
 import OrderFood from "./pages/OrderFood";
 import VendorOrders from "./pages/VendorOrders";
-import UserOrders from "./pages/UserOrders";
+import UserOrders from "./pages/UserOrder";
 import { AuthProvider } from "./contexts/AuthContext";
 import PrivateRoute from "./layout/PrivateRoute";
 import BulkOrderForm from "./pages/BulkOrderForm";
@@ -29,6 +29,7 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import ComplaintForm from "./pages/ComplaintForm";
 import ContactForm from "./pages/ContactForm";
 import FeedbackForm from "./pages/FeedbackForm";
+import UserOrder from "./pages/UserOrder";
 
 const App = () => {
   return (
@@ -72,6 +73,8 @@ const App = () => {
           <Route path="/cancellation-policy" element={<CancellationPolicy />} />
           <Route path="/terms" element={<TermsAndConditions />} />
           <Route path="/help" element={<HelpAndSupport />} />
+          <Route path="/user-order/:id" element={<UserOrder />} />
+
           {/* <Route path="/vendor/:vendorId" element={<VendorDetail />} /> */}
         </Route>
 

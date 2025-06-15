@@ -7,6 +7,7 @@ import api from "@/utils/axios";
 import Pagination from "@/components/Pagination";
 import WhyChooseRelswad from "./WhyChooseRelswad";
 import { SparklesIcon, FireIcon } from "@heroicons/react/20/solid";
+
 // Define interfaces
 interface Station {
   stationId: number;
@@ -343,89 +344,89 @@ const OrderFood = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-  {vendors.map((vendor) => (
-    <div
-      key={vendor.vendorId}
-      className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-200"
-      onClick={() => navigate(`/vendor-detail/${vendor.vendorId}`)}
-    >
-      <div className="relative h-48 w-full">
-        {vendor.logoUrl && imageUrls[vendor.logoUrl] ? (
-          <img
-            src={imageUrls[vendor.logoUrl]}
-            className="w-full h-full object-cover"
-            alt={vendor.businessName}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src =
-                "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=150&auto=format&fit=crop";
-            }}
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-            <span className="text-gray-400 text-sm">Loading image...</span>
-          </div>
-        )}
-      </div>
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold text-gray-800 line-clamp-1">
-            {vendor.businessName}
-          </h3>
-          <div className="flex items-center bg-blue-50 px-2 py-1 rounded-full">
-            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-            <span className="text-xs font-semibold text-blue-800 ml-1">
-              {vendor.rating?.toFixed(1) || "New"}
-            </span>
-          </div>
-        </div>
-        <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-          {vendor.description || "No description available"}
-        </p>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-gray-600 mb-4">
-          <div className="flex items-center">
-            <Clock className="w-3 h-3 mr-1" />
-            {vendor.preparationTimeMin || 15} min
-          </div>
-          <div className="text-right">
-            <div>
-              <span className="font-medium">Min:</span> ₹{vendor.minOrderAmount || 99}
+              {vendors.map((vendor) => (
+                <div
+                  key={vendor.vendorId}
+                  className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-200"
+                  onClick={() => navigate(`/order/${vendor.vendorId}`)}
+                >
+                  <div className="relative h-48 w-full">
+                    {vendor.logoUrl && imageUrls[vendor.logoUrl] ? (
+                      <img
+                        src={imageUrls[vendor.logoUrl]}
+                        className="w-full h-full object-cover"
+                        alt={vendor.businessName}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=150&auto=format&fit=crop";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                        <span className="text-gray-400 text-sm">Loading image...</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-lg font-bold text-gray-800 line-clamp-1">
+                        {vendor.businessName}
+                      </h3>
+                      <div className="flex items-center bg-blue-50 px-2 py-1 rounded-full">
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        <span className="text-xs font-semibold text-blue-800 ml-1">
+                          {vendor.rating?.toFixed(1) || "New"}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                      {vendor.description || "No description available"}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-gray-600 mb-4">
+                      <div className="flex items-center">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {vendor.preparationTimeMin || 15} min
+                      </div>
+                      <div className="text-right">
+                        <div>
+                          <span className="font-medium">Min:</span> ₹{vendor.minOrderAmount || 99}
+                        </div>
+                        <div
+                          className="flex items-center justify-end mt-1"
+                          aria-label={vendor.veg ? "Vegetarian" : "Non-Vegetarian"}
+                        >
+                          {vendor.veg ? (
+                            <>
+                              <SparklesIcon className="w-3 h-3 text-green-500 mr-1" />
+                              <span className="text-green-600">Veg</span>
+                            </>
+                          ) : (
+                            <>
+                              <FireIcon className="w-3 h-3 text-red-500 mr-1" />
+                              <span className="text-red-600">Non-Veg</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="font-medium">Cuisines:</span>{" "}
+                        {vendor.categories?.slice(0, 3).map((c) => c.categoryName).join(", ")}
+                        {vendor.categories.length > 3 && "..."}
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/user-order/${vendor.vendorId}`);
+                      }}
+                    >
+                      View Menu
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div
-              className="flex items-center justify-end mt-1"
-              aria-label={vendor.veg ? "Vegetarian" : "Non-Vegetarian"}
-            >
-            {vendor.veg ? (
-                <>
-                  <SparklesIcon className="w-3 h-3 text-green-500 mr-1" />
-                  <span className="text-green-600">Veg</span>
-                </>
-              ) : (
-                <>
-                  <FireIcon className="w-3 h-3 text-red-500 mr-1" />
-                  <span className="text-red-600">Non-Veg</span>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="col-span-2">
-            <span className="font-medium">Cuisines:</span>{" "}
-            {vendor.categories?.slice(0, 3).map((c) => c.categoryName).join(", ")}
-            {vendor.categories.length > 3 && "..."}
-          </div>
-        </div>
-        <Button
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-sm font-medium transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/vendor-detail/${vendor.vendorId}`);
-          }}
-        >
-          View Menu
-        </Button>
-      </div>
-    </div>
-  ))}
-</div>
 
             <div className="mt-8">
               <Pagination
