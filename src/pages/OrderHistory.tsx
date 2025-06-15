@@ -15,7 +15,7 @@ interface OrderItemDTO {
 
 interface OrderDTO {
   orderId: number;
-  customerId: number;
+  userId: number;
   vendorId: number;
   trainId: number;
   pnrNumber: string;
@@ -36,11 +36,11 @@ interface OrderDTO {
   items: OrderItemDTO[];
 }
 
-// Static mock data for development (same as VendorOrders)
+// Static mock data for development
 const mockOrders: OrderDTO[] = [
   {
     orderId: 1,
-    customerId: 37,
+    userId: 37,
     vendorId: 12,
     trainId: 12345,
     pnrNumber: "PNR123456",
@@ -64,7 +64,7 @@ const mockOrders: OrderDTO[] = [
   },
   {
     orderId: 2,
-    customerId: 37, // Same customer for testing
+    userId: 37,
     vendorId: 12,
     trainId: 12346,
     pnrNumber: "PNR654321",
@@ -88,7 +88,7 @@ const mockOrders: OrderDTO[] = [
   },
   {
     orderId: 3,
-    customerId: 37, // Same customer for testing
+    userId: 37,
     vendorId: 12,
     trainId: 12347,
     pnrNumber: "PNR112233",
@@ -142,8 +142,17 @@ const OrderHistory: React.FC = () => {
 
   useEffect(() => {
     const fetchOrders = async () => {
+      setLoading(true);
+      setError(null);
+
+      // Log userId for debugging
+      console.log("userId:", userId);
+
+      // If no userId, use mock data directly
       if (!userId) {
-        setError("Please log in to view your orders");
+        console.log("No userId, setting mockOrders");
+        setOrders(mockOrders);
+        setError("Not logged in. Showing sample data.");
         setLoading(false);
         return;
       }
@@ -151,13 +160,14 @@ const OrderHistory: React.FC = () => {
       try {
         // API call to fetch customer orders
         const response = await api.get(`/api/orders/customer?customerId=${userId}`);
+        console.log("API response:", response.data);
         if (response.status === 200) {
           setOrders(response.data);
         }
       } catch (err) {
         console.error("Error fetching orders:", err);
-        // Fallback to mock data for development
-        setOrders(mockOrders.filter((order) => order.customerId === userId));
+        console.log("Falling back to mockOrders");
+        setOrders(mockOrders); // Use mock data without filtering
         setError("Failed to fetch orders. Showing sample data.");
       } finally {
         setLoading(false);
@@ -167,19 +177,16 @@ const OrderHistory: React.FC = () => {
     fetchOrders();
   }, [userId]);
 
-  if (!userId) {
-    return (
-      <div className="p-4 text-center text-red-600 text-sm md:text-base">
-        Please log in to view your order history
-      </div>
-    );
-  }
+  // Log orders state for debugging
+  console.log("Current orders state:", orders);
 
+  // Filter orders based on historyFilter
   const filteredOrders = orders.filter((order) =>
-    historyFilter === "ALL"
-      ? ["DELIVERED", "CANCELLED"].includes(order.orderStatus)
-      : order.orderStatus === historyFilter
+    historyFilter === "ALL" ? true : order.orderStatus === historyFilter
   );
+
+  // Log filteredOrders for debugging
+  console.log("Filtered orders:", filteredOrders);
 
   const toggleOrderDetails = (orderId: number) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
@@ -230,9 +237,10 @@ const OrderHistory: React.FC = () => {
           <div className="text-center py-8 bg-white rounded-lg shadow-md">
             <p className="text-gray-600 text-sm md:text-base">Loading orders...</p>
           </div>
-        ) : error ? (
+        ) : error && filteredOrders.length === 0 ? (
           <div className="text-center py-8 bg-white rounded-lg shadow-md">
             <p className="text-red-600 text-sm md:text-base">{error}</p>
+            <p className="text-gray-600 text-sm md:text-base">No orders found</p>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="text-center py-8 bg-white rounded-lg shadow-md">
