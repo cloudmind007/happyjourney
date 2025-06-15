@@ -276,7 +276,7 @@ const UserOrder: React.FC = () => {
       setQuantities((prev) => ({ ...prev, [itemId]: 0 }));
     } catch (error: any) {
       console.error("Error adding item to cart:", error);
-      setError(error.response?.data || "Failed to add item to cart");
+      setError(error.response?.data?.message || "Failed to add item to cart");
     } finally {
       setIsAddingItem(null);
     }
@@ -301,11 +301,11 @@ const UserOrder: React.FC = () => {
         deliveryStationId: 1,
         deliveryInstructions: "",
       };
-      await api.post(`/cart/add-item`, request); // Assuming API supports updating quantity via same endpoint
+      await api.post(`/cart/add-item`, request);
       await fetchCartSummary();
     } catch (error: any) {
       console.error("Error updating cart item quantity:", error);
-      setError(error.response?.data || "Failed to update item quantity");
+      setError(error.response?.data?.message || "Failed to update item quantity");
     } finally {
       setIsAddingItem(null);
     }
@@ -317,7 +317,7 @@ const UserOrder: React.FC = () => {
       await fetchCartSummary();
     } catch (error: any) {
       console.error("Error removing item from cart:", error);
-      setError(error.response?.data || "Failed to remove item from cart");
+      setError(error.response?.data?.message || "Failed to remove item from cart");
     }
   };
 
@@ -329,7 +329,7 @@ const UserOrder: React.FC = () => {
       setIsCartExpanded(false);
     } catch (error: any) {
       console.error("Error clearing cart:", error);
-      setError(error.response?.data || "Failed to clear cart");
+      setError(error.response?.data?.message || "Failed to clear cart");
     }
   };
 
@@ -506,7 +506,7 @@ const UserOrder: React.FC = () => {
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                          <p className="text-gray-500">No menu items found in this category</p>
+                          <p className="text-gray-600">No menu items found in this category</p>
                         </div>
                       )}
                     </div>
@@ -517,7 +517,7 @@ const UserOrder: React.FC = () => {
           ) : (
             <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md border border-dashed border-gray-300">
               <h3 className="text-lg font-medium text-gray-700">No Categories Found</h3>
-              <p className="text-gray-500 mt-1">No categories available</p>
+              <p className="text-gray-600 mt-1">No categories available</p>
             </div>
           )}
         </div>
@@ -532,7 +532,7 @@ const UserOrder: React.FC = () => {
               className="bg-blue-600 hover:bg-blue-700 h-14 w-14 rounded-full shadow-lg relative"
               onClick={() => setIsCartExpanded(true)}
             >
-              <ShoppingCart className="w-6 h-6" />
+              <ShoppingCart className="w-6 h-6 text-white" />
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                 {cartSummary.items.reduce((sum, item) => sum + item.quantity, 0)}
               </span>
@@ -547,7 +547,7 @@ const UserOrder: React.FC = () => {
                 {cartSummary.items.map((item) => (
                   <div key={item.itemId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
-                      <p className="text-sm font-medium">{item.itemName}</p>
+                      <p className="text-sm font-medium text-gray-800">{item.itemName}</p>
                       <p className="text-xs text-gray-600">₹{item.unitPrice} × {item.quantity}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -556,6 +556,7 @@ const UserOrder: React.FC = () => {
                           className="p-2 text-gray-600 hover:bg-gray-100"
                           onClick={() => updateCartItemQuantity(item.itemId, item.quantity - 1)}
                           disabled={isAddingItem === item.itemId}
+                          aria-label={`Decrease quantity of ${item.itemName}`}
                         >
                           <Minus className="w-4 h-4" />
                         </button>
@@ -564,17 +565,19 @@ const UserOrder: React.FC = () => {
                           className="p-2 text-gray-600 hover:bg-gray-100"
                           onClick={() => updateCartItemQuantity(item.itemId, item.quantity + 1)}
                           disabled={isAddingItem === item.itemId}
+                          aria-label={`Increase quantity of ${item.itemName}`}
                         >
                           <Plus className="w-4 h-4" />
                         </button>
                       </div>
-                      <p className="text-sm font-medium">₹{(item.unitPrice * item.quantity).toFixed(2)}</p>
+                      <p className="text-sm font-medium text-gray-800">₹{(item.unitPrice * item.quantity).toFixed(2)}</p>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-red-600 hover:bg-red-50 p-2"
                         onClick={() => removeItemFromCart(item.itemId)}
                         disabled={isAddingItem === item.itemId}
+                        aria-label={`Remove ${item.itemName} from cart`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -603,13 +606,13 @@ const UserOrder: React.FC = () => {
               <div className="flex gap-3 mt-6">
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
                   onClick={() => setIsClearCartOpen(true)}
                 >
                   Clear
                 </Button>
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => navigate("/checkout")}
                 >
                   Checkout
@@ -620,13 +623,24 @@ const UserOrder: React.FC = () => {
 
           {/* Mobile Cart Drawer */}
           {isCartExpanded && (
-            <div ref={cartRef} className="fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden">
-              <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl p-6 max-h-[80vh] overflow-y-auto">
+            <div className="fixed inset-0 z-50 lg:hidden">
+              <div
+                className="absolute inset-0 bg-black bg-opacity-50 transition-opacity duration-300"
+                onClick={() => setIsCartExpanded(false)}
+              ></div>
+              <div
+                ref={cartRef}
+                className="absolute bottom-0 w-full bg-white rounded-t-3xl shadow-2xl p-6 max-h-[70vh] overflow-y-auto transform transition-transform duration-300 ease-in-out"
+              >
+                <div className="flex justify-center mb-4">
+                  <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+                </div>
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-gray-800">Your Order</h3>
                   <button
                     onClick={() => setIsCartExpanded(false)}
                     className="text-gray-500 hover:text-gray-700"
+                    aria-label="Close cart"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -643,7 +657,7 @@ const UserOrder: React.FC = () => {
                   {cartSummary.items.map((item) => (
                     <div key={item.itemId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{item.itemName}</p>
+                        <p className="text-sm font-medium text-gray-800">{item.itemName}</p>
                         <p className="text-xs text-gray-600">₹{item.unitPrice} × {item.quantity}</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -652,6 +666,7 @@ const UserOrder: React.FC = () => {
                             className="p-2 text-gray-600 hover:bg-gray-100"
                             onClick={() => updateCartItemQuantity(item.itemId, item.quantity - 1)}
                             disabled={isAddingItem === item.itemId}
+                            aria-label={`Decrease quantity of ${item.itemName}`}
                           >
                             <Minus className="w-4 h-4" />
                           </button>
@@ -660,17 +675,19 @@ const UserOrder: React.FC = () => {
                             className="p-2 text-gray-600 hover:bg-gray-100"
                             onClick={() => updateCartItemQuantity(item.itemId, item.quantity + 1)}
                             disabled={isAddingItem === item.itemId}
+                            aria-label={`Increase quantity of ${item.itemName}`}
                           >
                             <Plus className="w-4 h-4" />
                           </button>
                         </div>
-                        <p className="text-sm font-medium">₹{(item.unitPrice * item.quantity).toFixed(2)}</p>
+                        <p className="text-sm font-medium text-gray-800">₹{(item.unitPrice * item.quantity).toFixed(2)}</p>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="text-red-600 hover:bg-red-50 p-2"
                           onClick={() => removeItemFromCart(item.itemId)}
                           disabled={isAddingItem === item.itemId}
+                          aria-label={`Remove ${item.itemName} from cart`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -699,13 +716,13 @@ const UserOrder: React.FC = () => {
                 <div className="flex gap-3 mt-6">
                   <Button
                     variant="outline"
-                    className="flex-1"
+                    className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
                     onClick={() => setIsClearCartOpen(true)}
                   >
                     Clear
                   </Button>
                   <Button
-                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => {
                       setIsCartExpanded(false);
                       navigate("/checkout");
@@ -728,10 +745,10 @@ const UserOrder: React.FC = () => {
           </DialogHeader>
           <p className="text-gray-600">Are you sure you want to clear all items from your cart?</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsClearCartOpen(false)}>
+            <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50" onClick={() => setIsClearCartOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={clearCart} className="bg-red-600 hover:bg-red-700">
+            <Button onClick={clearCart} className="bg-red-600 hover:bg-red-700 text-white">
               Clear Cart
             </Button>
           </DialogFooter>
