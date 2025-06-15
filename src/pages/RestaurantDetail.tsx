@@ -30,19 +30,12 @@ interface MenuItem {
   itemId: number;
   itemName: string;
   basePrice: number;
-  vendorPrice?: number;
   description: string;
   categoryId: number;
   categoryName?: string;
   vendorId: number;
   vegetarian: boolean;
   available: boolean;
-  preparationTimeMin?: number;
-  imageUrl?: string;
-  displayOrder?: number;
-  availableStartTime?: string;
-  availableEndTime?: string;
-  itemCategory?: string;
 }
 
 interface RestaurantDetailProps {
@@ -56,6 +49,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isMenuItemModalOpen, setIsMenuItemModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -100,31 +95,39 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
 
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
+        if (!effectiveVendorId || isNaN(effectiveVendorId)) {
+          throw new Error("Invalid vendor ID");
+        }
+
         const vendorRes = await api.get(`/vendors/${effectiveVendorId}`);
+        console.log("Vendor data:", vendorRes.data);
         setVendor(vendorRes.data);
 
         const categoriesRes = await api.get(`/menu/vendors/${effectiveVendorId}/categories`);
+        console.log("Categories data:", categoriesRes.data);
         const fetchedCategories = categoriesRes.data.content || [];
         setCategories(fetchedCategories);
 
         const menuItemsRes = await api.get(`/menu/vendors/${effectiveVendorId}/items`);
+        console.log("Menu items data:", menuItemsRes.data);
         const itemsWithCategory = menuItemsRes.data.map((item: MenuItem) => ({
           ...item,
           categoryName:
-            fetchedCategories.find((cat: Category) => cat.categoryId === item.categoryId)
-              ?.categoryName || "Uncategorized",
+            fetchedCategories.find((cat: Category) => cat.categoryId === item.categoryId)?.categoryName ||
+            "Uncategorized",
         }));
         setMenuItems(itemsWithCategory);
-      } catch (error) {
-        console.error("Error fetching data, using static fallback:", error);
+      } catch (error: any) {
+        console.error("Error fetching data:", error);
+        setError(error.message || "Failed to load vendor details");
         setVendor(staticVendorData);
-        const fallbackCategories = [
+        setCategories([
           { categoryId: 1, categoryName: "Indian", vendorId: effectiveVendorId, displayOrder: 1 },
           { categoryId: 2, categoryName: "Chinese", vendorId: effectiveVendorId, displayOrder: 2 },
-          { categoryId: 3, categoryName: "Thai", vendorId: effectiveVendorId, displayOrder: 3 },
-        ];
-        setCategories(fallbackCategories);
+        ]);
         setMenuItems([
           {
             itemId: 1,
@@ -138,16 +141,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
           },
           {
             itemId: 2,
-            itemName: "Chicken Tikka Masala",
-            basePrice: 280,
-            description: "Grilled chicken in spiced curry",
-            categoryId: 1,
-            vendorId: effectiveVendorId,
-            vegetarian: false,
-            available: true,
-          },
-          {
-            itemId: 3,
             itemName: "Spring Rolls",
             basePrice: 180,
             description: "Crispy vegetable rolls",
@@ -156,17 +149,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
             vegetarian: true,
             available: true,
           },
-          {
-            itemId: 4,
-            itemName: "Pad Thai",
-            basePrice: 220,
-            description: "Stir-fried rice noodles",
-            categoryId: 3,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
         ]);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchData();
@@ -191,6 +176,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
       setRefresh(!refresh);
     } catch (error) {
       console.error(`Error deleting ${type}:`, error);
+      setError(`Failed to delete ${type}`);
     }
   };
 
@@ -242,9 +228,26 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
 
   const sortedCategories = [...categories].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
+  if (isLoading) {
+    return (
+      <div className="max-w-6xl mx-auto p-4">
+        <div className="flex justify-center items-center h-64">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-6xl mx-auto p-4">
+        <div className="text-red-600 text-lg">{error}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-8">
-      {/* Restaurant Header */}
       <div className="relative rounded-2xl overflow-hidden shadow-lg">
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
         <img
@@ -277,7 +280,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
         </div>
       </div>
 
-      {/* Menu Section */}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800 flex items-center">
@@ -444,14 +446,18 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                               <table className="min-w-full border-separate border-spacing-y-2">
                                 <thead>
                                   <tr className="text-left">
-                                    <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100 rounded-l-lg">Sr. No.</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100 rounded-l-lg">
+                                      Sr. No.
+                                    </th>
                                     <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Item ID</th>
                                     <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Item Name</th>
                                     <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Price</th>
                                     <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Vegetarian</th>
                                     <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100">Description</th>
                                     {!isViewOnly && !isVendor && (
-                                      <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100 rounded-r-lg">Actions</th>
+                                      <th className="px-4 py-3 font-medium text-gray-700 bg-gray-100 rounded-r-lg">
+                                        Actions
+                                      </th>
                                     )}
                                   </tr>
                                 </thead>
@@ -461,9 +467,13 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                                       key={item.itemId}
                                       className="text-sm hover:bg-gray-50 transition-colors"
                                     >
-                                      <td className="px-4 py-3 rounded-l-lg border border-gray-100">{index + 1}</td>
+                                      <td className="px-4 py-3 rounded-l-lg border border-gray-100">
+                                        {index + 1}
+                                      </td>
                                       <td className="px-4 py-3 border border-gray-100">{item.itemId}</td>
-                                      <td className="px-4 py-3 font-medium border border-gray-100">{item.itemName}</td>
+                                      <td className="px-4 py-3 font-medium border border-gray-100">
+                                        {item.itemName}
+                                      </td>
                                       <td className="px-4 py-3 border border-gray-100">₹{item.basePrice}</td>
                                       <td className="px-4 py-3 border border-gray-100">
                                         {item.vegetarian ? (
@@ -474,7 +484,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                                           "No"
                                         )}
                                       </td>
-                                      <td className="px-4 py-3 border border-gray-100 text-gray-600">{item.description}</td>
+                                      <td className="px-4 py-3 border border-gray-100 text-gray-600">
+                                        {item.description}
+                                      </td>
                                       {!isViewOnly && !isVendor && (
                                         <td className="px-4 py-3 rounded-r-lg border border-gray-100">
                                           <div className="flex gap-2">
@@ -525,7 +537,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
         </div>
       </div>
 
-      {/* Modals */}
       {!isViewOnly && !isVendor && (
         <>
           <AddCategoryModal
@@ -556,9 +567,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Select Excel File
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Select Excel File</label>
                   <Input
                     type="file"
                     accept=".xlsx,.xls"
@@ -566,29 +575,21 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ vendorId, isViewOnl
                     disabled={isUploading}
                     className="w-full"
                   />
-                  {selectedFile && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Selected: {selectedFile.name}
-                    </p>
-                  )}
+                  {selectedFile && <p className="text-sm text-gray-500 mt-1">Selected: {selectedFile.name}</p>}
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox
+                  <input
+                    type="checkbox"
                     id="clearExisting"
                     checked={clearExisting}
-                    onCheckedChange={(checked: boolean) => setClearExisting(checked as boolean)}
+                    onChange={(e) => setClearExisting(e.target.checked)}
                     disabled={isUploading}
                   />
-                  <label
-                    htmlFor="clearExisting"
-                    className="text-sm text-gray-700"
-                  >
+                  <label htmlFor="clearExisting" className="text-sm text-gray-700">
                     Clear existing menu items
                   </label>
                 </div>
-                {uploadError && (
-                  <p className="text-sm text-red-600">{uploadError}</p>
-                )}
+                {uploadError && <p className="text-sm text-red-600">{uploadError}</p>}
                 {isUploading && (
                   <div className="flex justify-center">
                     <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
