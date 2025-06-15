@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronUp, Star, Clock, Leaf, Utensils, Trash2, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Star, Clock, Leaf, Utensils, Trash2, Plus, Minus, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import api from "@/utils/axios";
@@ -66,6 +66,9 @@ const UserOrder: React.FC = () => {
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
   const [isClearCartOpen, setIsClearCartOpen] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState<number | null>(null);
+  const [quantities, setQuantities] = useState<{ [key: number]: number }>({});
+  const [isCartExpanded, setIsCartExpanded] = useState(false);
+  const cartRef = useRef<HTMLDivElement>(null);
 
   const effectiveVendorId = Number(urlId);
   const isCustomer = role?.toLowerCase() === "user";
@@ -100,16 +103,13 @@ const UserOrder: React.FC = () => {
           throw new Error("Invalid vendor ID");
         }
 
-        // Fetch vendor details
         const vendorRes = await api.get(`/vendors/${effectiveVendorId}`);
         setVendor(vendorRes.data);
 
-        // Fetch categories
         const categoriesRes = await api.get(`/menu/vendors/${effectiveVendorId}/categories`);
         const fetchedCategories = categoriesRes.data.content || [];
         setCategories(fetchedCategories);
 
-        // Fetch menu items
         const menuItemsRes = await api.get(`/menu/vendors/${effectiveVendorId}/items`);
         const itemsWithCategory = menuItemsRes.data.map((item: MenuItem) => ({
           ...item,
@@ -119,7 +119,6 @@ const UserOrder: React.FC = () => {
         }));
         setMenuItems(itemsWithCategory);
 
-        // Fetch cart summary
         await fetchCartSummary();
       } catch (error: any) {
         console.error("Error fetching data:", error);
@@ -128,6 +127,9 @@ const UserOrder: React.FC = () => {
         setCategories([
           { categoryId: 1, categoryName: "Indian", vendorId: effectiveVendorId, displayOrder: 1 },
           { categoryId: 2, categoryName: "Chinese", vendorId: effectiveVendorId, displayOrder: 2 },
+          { categoryId: 3, categoryName: "Italian", vendorId: effectiveVendorId, displayOrder: 3 },
+          { categoryId: 4, categoryName: "Mexican", vendorId: effectiveVendorId, displayOrder: 4 },
+          { categoryId: 5, categoryName: "Desserts", vendorId: effectiveVendorId, displayOrder: 5 },
         ]);
         setMenuItems([
           {
@@ -146,6 +148,86 @@ const UserOrder: React.FC = () => {
             basePrice: 180,
             description: "Crispy vegetable rolls",
             categoryId: 2,
+            vendorId: effectiveVendorId,
+            vegetarian: true,
+            available: true,
+          },
+          {
+            itemId: 3,
+            itemName: "Margherita Pizza",
+            basePrice: 300,
+            description: "Classic cheese and tomato pizza",
+            categoryId: 3,
+            vendorId: effectiveVendorId,
+            vegetarian: true,
+            available: true,
+          },
+          {
+            itemId: 4,
+            itemName: "Tacos",
+            basePrice: 220,
+            description: "Mexican style soft tacos",
+            categoryId: 4,
+            vendorId: effectiveVendorId,
+            vegetarian: true,
+            available: true,
+          },
+          {
+            itemId: 5,
+            itemName: "Chocolate Lava Cake",
+            basePrice: 150,
+            description: "Warm chocolate cake with molten center",
+            categoryId: 5,
+            vendorId: effectiveVendorId,
+            vegetarian: true,
+            available: true,
+          },
+          {
+            itemId: 6,
+            itemName: "Paneer Tikka",
+            basePrice: 200,
+            description: "Grilled cottage cheese skewers",
+            categoryId: 1,
+            vendorId: effectiveVendorId,
+            vegetarian: true,
+            available: true,
+          },
+          {
+            itemId: 7,
+            itemName: "Manchurian",
+            basePrice: 180,
+            description: "Indo-Chinese vegetable balls",
+            categoryId: 2,
+            vendorId: effectiveVendorId,
+            vegetarian: true,
+            available: true,
+          },
+          {
+            itemId: 8,
+            itemName: "Pasta Alfredo",
+            basePrice: 250,
+            description: "Creamy white sauce pasta",
+            categoryId: 3,
+            vendorId: effectiveVendorId,
+            vegetarian: true,
+            available: true,
+          },
+          {
+            itemId: 9,
+            itemName: "Burrito",
+            basePrice: 280,
+            description: "Mexican style stuffed wrap",
+            categoryId: 4,
+            vendorId: effectiveVendorId,
+            vegetarian: true,
+            available: true,
+          },
+          {
+            itemId: 10,
+            itemName: "Tiramisu",
+            basePrice: 200,
+            description: "Classic Italian dessert",
+            categoryId: 5,
             vendorId: effectiveVendorId,
             vegetarian: true,
             available: true,
@@ -173,13 +255,14 @@ const UserOrder: React.FC = () => {
     }
   };
 
-  const addItemToCart = async (itemId: number) => {
+  const addItemToCart = async (itemId: number, quantity: number) => {
+    if (quantity < 1) return;
     setIsAddingItem(itemId);
     try {
       const request = {
         itemId,
         vendorId: effectiveVendorId,
-        quantity: 1,
+        quantity,
         specialInstructions: "",
         trainId: 12345,
         pnrNumber: "1234567890",
@@ -190,9 +273,39 @@ const UserOrder: React.FC = () => {
       };
       await api.post(`/cart/add-item`, request);
       await fetchCartSummary();
+      setQuantities((prev) => ({ ...prev, [itemId]: 0 }));
     } catch (error: any) {
       console.error("Error adding item to cart:", error);
       setError(error.response?.data || "Failed to add item to cart");
+    } finally {
+      setIsAddingItem(null);
+    }
+  };
+
+  const updateCartItemQuantity = async (itemId: number, newQuantity: number) => {
+    if (newQuantity < 1) {
+      await removeItemFromCart(itemId);
+      return;
+    }
+    setIsAddingItem(itemId);
+    try {
+      const request = {
+        itemId,
+        vendorId: effectiveVendorId,
+        quantity: newQuantity,
+        specialInstructions: "",
+        trainId: 12345,
+        pnrNumber: "1234567890",
+        coachNumber: "A1",
+        seatNumber: "12",
+        deliveryStationId: 1,
+        deliveryInstructions: "",
+      };
+      await api.post(`/cart/add-item`, request); // Assuming API supports updating quantity via same endpoint
+      await fetchCartSummary();
+    } catch (error: any) {
+      console.error("Error updating cart item quantity:", error);
+      setError(error.response?.data || "Failed to update item quantity");
     } finally {
       setIsAddingItem(null);
     }
@@ -213,6 +326,7 @@ const UserOrder: React.FC = () => {
       await api.delete(`/cart`, { params: { vendorId: effectiveVendorId } });
       setCartSummary(null);
       setIsClearCartOpen(false);
+      setIsCartExpanded(false);
     } catch (error: any) {
       console.error("Error clearing cart:", error);
       setError(error.response?.data || "Failed to clear cart");
@@ -223,11 +337,29 @@ const UserOrder: React.FC = () => {
     setExpandedCategory(expandedCategory === categoryId ? null : categoryId);
   };
 
+  const handleQuantityChange = (itemId: number, value: string) => {
+    const numValue = parseInt(value) || 0;
+    if (numValue >= 0) {
+      setQuantities((prev) => ({ ...prev, [itemId]: numValue }));
+    }
+  };
+
+  const handleClickOutside = (event: MouseEvent) => {
+    if (cartRef.current && !cartRef.current.contains(event.target as Node)) {
+      setIsCartExpanded(false);
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const sortedCategories = [...categories].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto p-4">
+      <div className="max-w-7xl mx-auto p-4">
         <div className="flex justify-center items-center h-64">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
         </div>
@@ -237,31 +369,31 @@ const UserOrder: React.FC = () => {
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto p-4">
-        <div className="text-red-600 text-lg">{error}</div>
+      <div className="max-w-7xl mx-auto p-4">
+        <div className="text-red-600 text-lg font-medium">{error}</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
       {/* Restaurant Header */}
-      <div className="relative rounded-2xl overflow-hidden shadow-lg mb-6">
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+      <div className="relative rounded-2xl overflow-hidden shadow-xl mb-8">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent"></div>
         <img
           src={vendor?.logoUrl ? getLogoUrl(vendor.logoUrl) : "https://via.placeholder.com/1500x500"}
           alt={vendor?.businessName || "Restaurant"}
-          className="w-full h-64 object-cover"
+          className="w-full h-64 sm:h-80 object-cover"
           onError={(e) => {
-            console.error("Failed to load logo:", vendor?.logoUrl);
             e.currentTarget.src = "https://via.placeholder.com/1500x500";
           }}
         />
-        <div className="absolute bottom-0 left-0 p-6 text-white">
-          <h1 className="text-3xl font-bold">{vendor?.businessName || "Restaurant"}</h1>
-          <div className="flex items-center mt-2 space-x-4">
+        <div className="absolute bottom-0 left-0 p-6 sm:p-8 text-white">
+          <h1 className="text-3xl sm:text-4xl font-bold">{vendor?.businessName || "Restaurant"}</h1>
+          <p className="text-sm sm:text-base mt-2 max-w-md">{vendor?.description}</p>
+          <div className="flex flex-wrap items-center mt-4 gap-3">
             <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
-              <Star className="w-4 h-4 mr-1" />
+              <Star className="w-4 h-4 mr-1 text-yellow-400" />
               {vendor?.rating || 0}
             </span>
             <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
@@ -270,7 +402,7 @@ const UserOrder: React.FC = () => {
             </span>
             {vendor?.veg && (
               <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
-                <Leaf className="w-4 h-4 mr-1" />
+                <Leaf className="w-4 h-4 mr-1 text-green-400" />
                 Vegetarian
               </span>
             )}
@@ -279,114 +411,170 @@ const UserOrder: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="relative flex flex-col lg:flex-row gap-8">
         {/* Menu Section */}
         <div className="flex-1 space-y-8">
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-              <Utensils className="w-5 h-5 mr-2 text-amber-500" />
-              Menu
-            </h2>
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-              {sortedCategories.length > 0 ? (
-                <div className="space-y-4">
-                  {sortedCategories.map((category) => {
-                    const categoryItems = menuItems.filter((item) => item.categoryId === category.categoryId);
-                    return (
-                      <div
-                        key={category.categoryId}
-                        className="bg-white rounded-lg shadow-sm border border-gray-200 hover:border-amber-300 transition-colors"
-                      >
-                        <div
-                          className="flex justify-between items-center p-4 cursor-pointer"
-                          onClick={() => toggleCategory(category.categoryId)}
-                        >
-                          <h3 className="text-lg font-semibold text-gray-800">{category.categoryName}</h3>
-                          <div>
-                            {expandedCategory === category.categoryId ? (
-                              <ChevronUp className="w-5 h-5 text-gray-500" />
-                            ) : (
-                              <ChevronDown className="w-5 h-5 text-gray-500" />
-                            )}
-                          </div>
-                        </div>
-                        {expandedCategory === category.categoryId && (
-                          <div className="p-4 border-t border-gray-100">
-                            {categoryItems.length > 0 ? (
-                              <div className="space-y-4">
-                                {categoryItems.map((item) => (
-                                  <div
-                                    key={item.itemId}
-                                    className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-200"
-                                  >
-                                    <div className="flex-1">
-                                      <h4 className="text-md font-medium text-gray-800">{item.itemName}</h4>
-                                      <p className="text-sm text-gray-600">{item.description}</p>
-                                      <div className="flex items-center mt-1 space-x-2">
-                                        <span className="text-sm font-medium">₹{item.basePrice}</span>
-                                        {item.vegetarian && (
-                                          <span className="text-green-600 flex items-center text-sm">
-                                            <Leaf className="w-3 h-3 mr-1" /> Veg
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <Button
-                                      onClick={() => addItemToCart(item.itemId)}
-                                      className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2"
-                                      disabled={isAddingItem === item.itemId || !item.available}
-                                    >
-                                      {isAddingItem === item.itemId ? (
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                      ) : (
-                                        <span className="flex items-center">
-                                          <Plus className="w-4 h-4 mr-1" /> Add
-                                        </span>
-                                      )}
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                                <p className="text-gray-500">No menu items found in this category</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center p-8 bg-white rounded-lg border border-dashed border-gray-300">
-                  <h3 className="text-lg font-medium text-gray-700">No Categories Found</h3>
-                  <p className="text-gray-500 mt-1">No categories available</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Cart Section - Fixed at bottom on mobile, sidebar on desktop */}
-        {cartSummary?.items.length ? (
-          <div className="lg:w-80 lg:sticky lg:top-4 lg:h-fit">
-            <div className="bg-white rounded-lg shadow-lg p-4 lg:border border-gray-200 fixed bottom-0 left-0 right-0 lg:relative">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Order</h3>
-              <div className="max-h-64 overflow-y-auto mb-4">
-                {cartSummary.items.map((item) => (
-                  <div key={item.itemId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center">
+            <Utensils className="w-6 h-6 mr-2 text-amber-500" />
+            Menu
+          </h2>
+          {sortedCategories.length > 0 ? (
+            sortedCategories.map((category) => {
+              const categoryItems = menuItems.filter((item) => item.categoryId === category.categoryId);
+              return (
+                <div
+                  key={category.categoryId}
+                  className="bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow"
+                >
+                  <div
+                    className="flex justify-between items-center p-4 sm:p-6 cursor-pointer"
+                    onClick={() => toggleCategory(category.categoryId)}
+                  >
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-800">{category.categoryName}</h3>
                     <div>
+                      {expandedCategory === category.categoryId ? (
+                        <ChevronUp className="w-5 h-5 text-gray-500" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-gray-500" />
+                      )}
+                    </div>
+                  </div>
+                  {expandedCategory === category.categoryId && (
+                    <div className="p-4 sm:p-6 border-t border-gray-100">
+                      {categoryItems.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {categoryItems.map((item) => (
+                            <div
+                              key={item.itemId}
+                              className="flex flex-col p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-amber-300 transition-colors"
+                            >
+                              <div className="flex-1">
+                                <h4 className="text-md font-medium text-gray-800">{item.itemName}</h4>
+                                <p className="text-sm text-gray-600 line-clamp-2">{item.description}</p>
+                                <div className="flex items-center mt-2 gap-2">
+                                  <span className="text-sm font-medium">₹{item.basePrice}</span>
+                                  {item.vegetarian && (
+                                    <span className="text-green-600 flex items-center text-sm">
+                                      <Leaf className="w-3 h-3 mr-1" /> Veg
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 mt-3">
+                                <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                                  <button
+                                    className="p-2 text-gray-600 hover:bg-gray-100"
+                                    onClick={() =>
+                                      handleQuantityChange(item.itemId, String((quantities[item.itemId] || 0) - 1))
+                                    }
+                                    disabled={(quantities[item.itemId] || 0) <= 0}
+                                  >
+                                    <Minus className="w-4 h-4" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    value={quantities[item.itemId] || 0}
+                                    onChange={(e) => handleQuantityChange(item.itemId, e.target.value)}
+                                    className="w-12 text-center border-x border-gray-300 focus:outline-none"
+                                    min="0"
+                                  />
+                                  <button
+                                    className="p-2 text-gray-600 hover:bg-gray-100"
+                                    onClick={() =>
+                                      handleQuantityChange(item.itemId, String((quantities[item.itemId] || 0) + 1))
+                                    }
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                  </button>
+                                </div>
+                                <Button
+                                  onClick={() => addItemToCart(item.itemId, quantities[item.itemId] || 1)}
+                                  className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm"
+                                  disabled={isAddingItem === item.itemId || !item.available || (quantities[item.itemId] || 0) <= 0}
+                                >
+                                  {isAddingItem === item.itemId ? (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    <span className="flex items-center justify-center">
+                                      <Plus className="w-4 h-4 mr-1" /> Add
+                                    </span>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                          <p className="text-gray-500">No menu items found in this category</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md border border-dashed border-gray-300">
+              <h3 className="text-lg font-medium text-gray-700">No Categories Found</h3>
+              <p className="text-gray-500 mt-1">No categories available</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Cart Section */}
+      {cartSummary?.items.length ? (
+        <>
+          {/* Floating Cart Button - Mobile */}
+          <div className="fixed bottom-4 right-4 lg:hidden z-50">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 h-14 w-14 rounded-full shadow-lg relative"
+              onClick={() => setIsCartExpanded(true)}
+            >
+              <ShoppingCart className="w-6 h-6" />
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {cartSummary.items.reduce((sum, item) => sum + item.quantity, 0)}
+              </span>
+            </Button>
+          </div>
+
+          {/* Cart Panel - Desktop */}
+          <div className="hidden lg:block mt-8">
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sticky top-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Order</h3>
+              <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
+                {cartSummary.items.map((item) => (
+                  <div key={item.itemId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
                       <p className="text-sm font-medium">{item.itemName}</p>
-                      <p className="text-xs text-gray-600">₹{item.unitPrice} x {item.quantity}</p>
+                      <p className="text-xs text-gray-600">₹{item.unitPrice} × {item.quantity}</p>
                     </div>
                     <div className="flex items-center gap-2">
+                      <div className="flex items-center border border-gray-300 rounded-lg">
+                        <button
+                          className="p-2 text-gray-600 hover:bg-gray-100"
+                          onClick={() => updateCartItemQuantity(item.itemId, item.quantity - 1)}
+                          disabled={isAddingItem === item.itemId}
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <span className="w-12 text-center text-sm">{item.quantity}</span>
+                        <button
+                          className="p-2 text-gray-600 hover:bg-gray-100"
+                          onClick={() => updateCartItemQuantity(item.itemId, item.quantity + 1)}
+                          disabled={isAddingItem === item.itemId}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
                       <p className="text-sm font-medium">₹{(item.unitPrice * item.quantity).toFixed(2)}</p>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        className="text-red-600 hover:bg-red-50 p-2"
                         onClick={() => removeItemFromCart(item.itemId)}
+                        disabled={isAddingItem === item.itemId}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -394,7 +582,7 @@ const UserOrder: React.FC = () => {
                   </div>
                 ))}
               </div>
-              <div className="border-t border-gray-200 pt-4">
+              <div className="border-t border-gray-200 pt-4 space-y-2">
                 <div className="flex justify-between text-sm text-gray-700">
                   <span>Subtotal</span>
                   <span>₹{cartSummary.subtotal.toFixed(2)}</span>
@@ -404,24 +592,133 @@ const UserOrder: React.FC = () => {
                   <span>₹{cartSummary.taxAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-gray-700">
-                  <span>Delivery Charges</span>
+                  <span>Delivery</span>
                   <span>₹{cartSummary.deliveryCharges.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-md font-bold text-gray-800 mt-2">
+                <div className="flex justify-between text-base font-bold text-gray-800 pt-2">
                   <span>Total</span>
                   <span>₹{cartSummary.finalAmount.toFixed(2)}</span>
                 </div>
               </div>
-              <div className="flex gap-2 mt-4">
-                <Button variant="outline" className="flex-1" onClick={() => setIsClearCartOpen(true)}>
-                  Clear Cart
+              <div className="flex gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setIsClearCartOpen(true)}
+                >
+                  Clear
                 </Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700">Proceed to Checkout</Button>
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  onClick={() => navigate("/checkout")}
+                >
+                  Checkout
+                </Button>
               </div>
             </div>
           </div>
-        ) : null}
-      </div>
+
+          {/* Mobile Cart Drawer */}
+          {isCartExpanded && (
+            <div ref={cartRef} className="fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden">
+              <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl p-6 max-h-[80vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold text-gray-800">Your Order</h3>
+                  <button
+                    onClick={() => setIsCartExpanded(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="space-y-3 mb-4">
+                  {cartSummary.items.map((item) => (
+                    <div key={item.itemId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{item.itemName}</p>
+                        <p className="text-xs text-gray-600">₹{item.unitPrice} × {item.quantity}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center border border-gray-300 rounded-lg">
+                          <button
+                            className="p-2 text-gray-600 hover:bg-gray-100"
+                            onClick={() => updateCartItemQuantity(item.itemId, item.quantity - 1)}
+                            disabled={isAddingItem === item.itemId}
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <span className="w-12 text-center text-sm">{item.quantity}</span>
+                          <button
+                            className="p-2 text-gray-600 hover:bg-gray-100"
+                            onClick={() => updateCartItemQuantity(item.itemId, item.quantity + 1)}
+                            disabled={isAddingItem === item.itemId}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-sm font-medium">₹{(item.unitPrice * item.quantity).toFixed(2)}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:bg-red-50 p-2"
+                          onClick={() => removeItemFromCart(item.itemId)}
+                          disabled={isAddingItem === item.itemId}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-gray-200 pt-4 space-y-2">
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Subtotal</span>
+                    <span>₹{cartSummary.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Tax</span>
+                    <span>₹{cartSummary.taxAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Delivery</span>
+                    <span>₹{cartSummary.deliveryCharges.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-base font-bold text-gray-800 pt-2">
+                    <span>Total</span>
+                    <span>₹{cartSummary.finalAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setIsClearCartOpen(true)}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    onClick={() => {
+                      setIsCartExpanded(false);
+                      navigate("/checkout");
+                    }}
+                  >
+                    Checkout
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      ) : null}
 
       {/* Clear Cart Confirmation */}
       <Dialog open={isClearCartOpen} onOpenChange={setIsClearCartOpen}>
@@ -431,16 +728,10 @@ const UserOrder: React.FC = () => {
           </DialogHeader>
           <p className="text-gray-600">Are you sure you want to clear all items from your cart?</p>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsClearCartOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsClearCartOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={clearCart}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <Button onClick={clearCart} className="bg-red-600 hover:bg-red-700">
               Clear Cart
             </Button>
           </DialogFooter>
