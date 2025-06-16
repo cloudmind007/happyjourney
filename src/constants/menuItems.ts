@@ -28,6 +28,11 @@ export const adminMenuItems: MenuItem[] = [
   { icon: UtensilsCrossed, label: "Restaurant", path: "/restaurant" },
   { icon: Users, label: "Customers", path: "/customers" },
   { icon: MapPin, label: "Station", path: "/stations" },
+  { icon: MapPin, label: "Station", path: "/stations" },
+  { icon: MapPin, label: "Callback request", path: "/callbackrequests" },
+  { icon: MapPin, label: "Complaints", path: "/complaints" },
+  { icon: MapPin, label: "", path: "/" },
+
 ];
 
 export const vendorMenuItems: MenuItem[] = [

@@ -14,6 +14,7 @@ interface Vendor {
   preparationTimeMin: number;
   rating: number;
   veg: boolean;
+  stationId?: number;
 }
 
 interface Category {
@@ -70,7 +71,18 @@ const UserOrder: React.FC = () => {
   const [isCartExpanded, setIsCartExpanded] = useState(false);
   const cartRef = useRef<HTMLDivElement>(null);
 
+  // Validate vendorId
   const effectiveVendorId = Number(urlId);
+  if (isNaN(effectiveVendorId)) {
+    return (
+      <div className="max-w-7xl mx-auto p-4">
+        <div className="text-red-600 text-lg font-medium">
+          Invalid vendor ID. Please go back and try again.
+        </div>
+      </div>
+    );
+  }
+
   const isCustomer = role?.toLowerCase() === "user";
   const DOWNLOAD_ENDPOINT = "http://94.136.184.78:8080/api/files/download";
 
@@ -78,19 +90,10 @@ const UserOrder: React.FC = () => {
     return `${DOWNLOAD_ENDPOINT}?systemFileName=${encodeURIComponent(systemFileName)}`;
   };
 
-  const staticVendorData: Vendor = {
-    vendorId: effectiveVendorId,
-    businessName: "Tasty Bites",
-    description: "A cozy restaurant serving delicious vegetarian meals.",
-    logoUrl: "5e815990-aa46-4d4f-b493-48dbde3737a3-amr-taha-Zbvr7FWB4fc-unsplash.jpg",
-    preparationTimeMin: 30,
-    rating: 4.5,
-    veg: true,
-  };
-
   useEffect(() => {
     if (!isCustomer || !userId) {
       navigate("/login");
+      return;
     }
   }, [isCustomer, userId, navigate]);
 
@@ -99,17 +102,16 @@ const UserOrder: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
-        if (!effectiveVendorId || isNaN(effectiveVendorId)) {
-          throw new Error("Invalid vendor ID");
-        }
-
+        // Fetch vendor details
         const vendorRes = await api.get(`/vendors/${effectiveVendorId}`);
         setVendor(vendorRes.data);
 
+        // Fetch categories
         const categoriesRes = await api.get(`/menu/vendors/${effectiveVendorId}/categories`);
         const fetchedCategories = categoriesRes.data.content || [];
         setCategories(fetchedCategories);
 
+        // Fetch menu items
         const menuItemsRes = await api.get(`/menu/vendors/${effectiveVendorId}/items`);
         const itemsWithCategory = menuItemsRes.data.map((item: MenuItem) => ({
           ...item,
@@ -122,117 +124,7 @@ const UserOrder: React.FC = () => {
         await fetchCartSummary();
       } catch (error: any) {
         console.error("Error fetching data:", error);
-        setError(error.message || "Failed to load restaurant details");
-        setVendor(staticVendorData);
-        setCategories([
-          { categoryId: 1, categoryName: "Indian", vendorId: effectiveVendorId, displayOrder: 1 },
-          { categoryId: 2, categoryName: "Chinese", vendorId: effectiveVendorId, displayOrder: 2 },
-          { categoryId: 3, categoryName: "Italian", vendorId: effectiveVendorId, displayOrder: 3 },
-          { categoryId: 4, categoryName: "Mexican", vendorId: effectiveVendorId, displayOrder: 4 },
-          { categoryId: 5, categoryName: "Desserts", vendorId: effectiveVendorId, displayOrder: 5 },
-        ]);
-        setMenuItems([
-          {
-            itemId: 1,
-            itemName: "Butter Chicken",
-            basePrice: 250,
-            description: "Creamy tomato-based curry",
-            categoryId: 1,
-            vendorId: effectiveVendorId,
-            vegetarian: false,
-            available: true,
-          },
-          {
-            itemId: 2,
-            itemName: "Spring Rolls",
-            basePrice: 180,
-            description: "Crispy vegetable rolls",
-            categoryId: 2,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
-          {
-            itemId: 3,
-            itemName: "Margherita Pizza",
-            basePrice: 300,
-            description: "Classic cheese and tomato pizza",
-            categoryId: 3,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
-          {
-            itemId: 4,
-            itemName: "Tacos",
-            basePrice: 220,
-            description: "Mexican style soft tacos",
-            categoryId: 4,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
-          {
-            itemId: 5,
-            itemName: "Chocolate Lava Cake",
-            basePrice: 150,
-            description: "Warm chocolate cake with molten center",
-            categoryId: 5,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
-          {
-            itemId: 6,
-            itemName: "Paneer Tikka",
-            basePrice: 200,
-            description: "Grilled cottage cheese skewers",
-            categoryId: 1,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
-          {
-            itemId: 7,
-            itemName: "Manchurian",
-            basePrice: 180,
-            description: "Indo-Chinese vegetable balls",
-            categoryId: 2,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
-          {
-            itemId: 8,
-            itemName: "Pasta Alfredo",
-            basePrice: 250,
-            description: "Creamy white sauce pasta",
-            categoryId: 3,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
-          {
-            itemId: 9,
-            itemName: "Burrito",
-            basePrice: 280,
-            description: "Mexican style stuffed wrap",
-            categoryId: 4,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
-          {
-            itemId: 10,
-            itemName: "Tiramisu",
-            basePrice: 200,
-            description: "Classic Italian dessert",
-            categoryId: 5,
-            vendorId: effectiveVendorId,
-            vegetarian: true,
-            available: true,
-          },
-        ]);
+        setError(error.response?.data?.message || "Failed to load restaurant details. Please try again later.");
       } finally {
         setIsLoading(false);
       }
@@ -264,12 +156,7 @@ const UserOrder: React.FC = () => {
         vendorId: effectiveVendorId,
         quantity,
         specialInstructions: "",
-        trainId: 12345,
-        pnrNumber: "1234567890",
-        coachNumber: "A1",
-        seatNumber: "12",
-        deliveryStationId: 1,
-        deliveryInstructions: "",
+        deliveryStationId: vendor?.stationId || null,
       };
       await api.post(`/cart/add-item`, request);
       await fetchCartSummary();
@@ -294,12 +181,7 @@ const UserOrder: React.FC = () => {
         vendorId: effectiveVendorId,
         quantity: newQuantity,
         specialInstructions: "",
-        trainId: 12345,
-        pnrNumber: "1234567890",
-        coachNumber: "A1",
-        seatNumber: "12",
-        deliveryStationId: 1,
-        deliveryInstructions: "",
+        deliveryStationId: vendor?.stationId || null,
       };
       await api.post(`/cart/add-item`, request);
       await fetchCartSummary();
@@ -367,10 +249,12 @@ const UserOrder: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error || !vendor) {
     return (
       <div className="max-w-7xl mx-auto p-4">
-        <div className="text-red-600 text-lg font-medium">{error}</div>
+        <div className="text-red-600 text-lg font-medium">
+          {error || "Failed to load restaurant details. Please try again later."}
+        </div>
       </div>
     );
   }
@@ -381,26 +265,26 @@ const UserOrder: React.FC = () => {
       <div className="relative rounded-2xl overflow-hidden shadow-xl mb-8">
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent"></div>
         <img
-          src={vendor?.logoUrl ? getLogoUrl(vendor.logoUrl) : "https://via.placeholder.com/1500x500"}
-          alt={vendor?.businessName || "Restaurant"}
+          src={vendor.logoUrl ? getLogoUrl(vendor.logoUrl) : "https://via.placeholder.com/1500x500"}
+          alt={vendor.businessName}
           className="w-full h-64 sm:h-80 object-cover"
           onError={(e) => {
             e.currentTarget.src = "https://via.placeholder.com/1500x500";
           }}
         />
         <div className="absolute bottom-0 left-0 p-6 sm:p-8 text-white">
-          <h1 className="text-3xl sm:text-4xl font-bold">{vendor?.businessName || "Restaurant"}</h1>
-          <p className="text-sm sm:text-base mt-2 max-w-md">{vendor?.description}</p>
+          <h1 className="text-3xl sm:text-4xl font-bold">{vendor.businessName}</h1>
+          <p className="text-sm sm:text-base mt-2 max-w-md">{vendor.description}</p>
           <div className="flex flex-wrap items-center mt-4 gap-3">
             <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
               <Star className="w-4 h-4 mr-1 text-yellow-400" />
-              {vendor?.rating || 0}
+              {vendor.rating}
             </span>
             <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
               <Clock className="w-4 h-4 mr-1" />
-              {vendor?.preparationTimeMin || 0} min
+              {vendor.preparationTimeMin} min
             </span>
-            {vendor?.veg && (
+            {vendor.veg && (
               <span className="flex items-center bg-white/20 px-3 py-1 rounded-full text-sm">
                 <Leaf className="w-4 h-4 mr-1 text-green-400" />
                 Vegetarian
@@ -517,7 +401,7 @@ const UserOrder: React.FC = () => {
           ) : (
             <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md border border-dashed border-gray-300">
               <h3 className="text-lg font-medium text-gray-700">No Categories Found</h3>
-              <p className="text-gray-600 mt-1">No categories available</p>
+              <p className="text-gray-600 mt-1">No categories available for this restaurant.</p>
             </div>
           )}
         </div>
@@ -613,7 +497,7 @@ const UserOrder: React.FC = () => {
                 </Button>
                 <Button
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => navigate("/checkout")}
+                  onClick={() => navigate(`/checkout/${effectiveVendorId}`)}
                 >
                   Checkout
                 </Button>
@@ -725,7 +609,7 @@ const UserOrder: React.FC = () => {
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => {
                       setIsCartExpanded(false);
-                      navigate("/checkout");
+                      navigate(`/checkout/${effectiveVendorId}`);
                     }}
                   >
                     Checkout
