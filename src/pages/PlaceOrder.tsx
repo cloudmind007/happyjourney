@@ -585,10 +585,10 @@ const PlaceOrder: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent className="bg-white rounded-lg shadow-lg">
                     <SelectItem value="COD" className="hover:bg-gray-100">
-                      Cash on Delivery (COD)
+                      Cash on Delivery 
                     </SelectItem>
                     <SelectItem value="ONLINE" className="hover:bg-gray-100">
-                      Online Payment (Razorpay)
+                      Online Payment 
                     </SelectItem>
                   </SelectContent>
                 </Select>
