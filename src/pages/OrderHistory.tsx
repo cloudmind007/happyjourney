@@ -473,7 +473,7 @@ const OrderHistory: React.FC = () => {
     doc.text("Delivery Charges:", pageWidth - marginRight - labelColumnWidth, currentY);
     doc.text(`₹${order.deliveryCharges.toFixed(2)}`, pageWidth - marginRight, currentY, { align: "right" });
     currentY += 6;
-    doc.text(`Tax (${order.taxPercentage || 5}%):`, pageWidth - marginRight - labelColumnWidth, currentY);
+    doc.text(`IGST (${order.taxPercentage || 5}%):`, pageWidth - marginRight - labelColumnWidth, currentY);
     doc.text(`₹${order.taxAmount.toFixed(2)}`, pageWidth - marginRight, currentY, { align: "right" });
     currentY += 6;
     if (order.discountAmount && order.discountAmount > 0) {
