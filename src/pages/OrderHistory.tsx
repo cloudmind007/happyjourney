@@ -1,26 +1,17 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  FaTrain, 
-  FaChair, 
-  FaRupeeSign, 
-  FaInfoCircle, 
+import {
+  FaTrain,
+  FaChair,
+  FaRupeeSign,
+  FaInfoCircle,
   FaDownload,
   FaMapMarkerAlt,
   FaReceipt,
-  FaBoxOpen
+  FaBoxOpen,
 } from "react-icons/fa";
 import { MdPayment, MdFastfood } from "react-icons/md";
 import { IoTime, IoChevronDown, IoChevronUp } from "react-icons/io5";
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Loader2,
-  CreditCard,
-  Wallet,
-  Truck,
-  ChefHat
-} from "lucide-react";
+import { CheckCircle, XCircle, Clock, Loader2, CreditCard, Wallet, Truck, ChefHat } from "lucide-react";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import api from "@/utils/axios";
@@ -65,7 +56,6 @@ interface OrderDTO {
   deliveryInstructions: string | null;
   items: OrderItemDTO[];
   vendorName?: string;
-  trainName?: string;
   trainNumber?: string;
 }
 
@@ -77,12 +67,17 @@ interface StationDTO {
   state: string;
 }
 
-interface ItemDTO {
+interface MenuItemDTO {
   itemId: number;
   itemName: string;
   description: string;
   category: string;
   imageUrl: string | null;
+}
+
+interface VendorDTO {
+  vendorId: number;
+  businessName: string;
 }
 
 interface PageResponse<T> {
@@ -96,71 +91,71 @@ interface PageResponse<T> {
 }
 
 const statusConfig = {
-  PLACED: { 
-    color: "bg-blue-50 text-blue-800", 
+  PLACED: {
+    color: "bg-blue-50 text-blue-800",
     icon: <Clock className="w-4 h-4" />,
-    label: "Order Placed"
+    label: "Order Placed",
   },
-  PENDING: { 
-    color: "bg-amber-50 text-amber-800", 
+  PENDING: {
+    color: "bg-amber-50 text-amber-800",
     icon: <Clock className="w-4 h-4" />,
-    label: "Pending Confirmation"
+    label: "Pending Confirmation",
   },
-  PREPARING: { 
-    color: "bg-purple-50 text-purple-800", 
+  PREPARING: {
+    color: "bg-purple-50 text-purple-800",
     icon: <ChefHat className="w-4 h-4" />,
-    label: "Preparing Your Meal"
+    label: "Preparing Your Meal",
   },
-  DELIVERED: { 
-    color: "bg-green-50 text-green-800", 
+  DELIVERED: {
+    color: "bg-green-50 text-green-800",
     icon: <CheckCircle className="w-4 h-4" />,
-    label: "Delivered Successfully"
+    label: "Delivered Successfully",
   },
-  CANCELLED: { 
-    color: "bg-red-50 text-red-800", 
+  CANCELLED: {
+    color: "bg-red-50 text-red-800",
     icon: <XCircle className="w-4 h-4" />,
-    label: "Order Cancelled"
+    label: "Order Cancelled",
   },
 };
 
 const paymentConfig = {
-  PAID: { 
-    color: "bg-green-50 text-green-800", 
+  PAID: {
+    color: "bg-green-50 text-green-800",
     icon: <CheckCircle className="w-4 h-4" />,
-    label: "Payment Successful"
+    label: "Payment Successful",
   },
-  PENDING: { 
-    color: "bg-amber-50 text-amber-800", 
+  PENDING: {
+    color: "bg-amber-50 text-amber-800",
     icon: <Clock className="w-4 h-4" />,
-    label: "Payment Pending"
+    label: "Payment Pending",
   },
-  FAILED: { 
-    color: "bg-red-50 text-red-800", 
+  FAILED: {
+    color: "bg-red-50 text-red-800",
     icon: <XCircle className="w-4 h-4" />,
-    label: "Payment Failed"
+    label: "Payment Failed",
   },
 };
 
 const paymentMethodConfig = {
-  COD: { 
-    color: "text-red-600", 
+  COD: {
+    color: "text-red-600",
     icon: <Wallet className="w-5 h-5" />,
-    label: "Cash on Delivery" 
+    label: "Cash on Delivery",
   },
-  UPI: { 
-    color: "text-blue-600", 
+  UPI: {
+    color: "text-blue-600",
     icon: <MdPayment className="w-5 h-5" />,
-    label: "UPI Payment" 
+    label: "UPI Payment",
   },
-  CARD: { 
-    color: "text-purple-600", 
+  CARD: {
+    color: "text-purple-600",
     icon: <CreditCard className="w-5 h-5" />,
-    label: "Credit/Debit Card" 
+    label: "Credit/Debit Card",
   },
-  NETBANKING: { 
-    color: "text-green-600", 
+  NETBANKING: {
+    color: "text-green-600",
     icon: <MdPayment className="w-5 h-5" />,
-    label: "Net Banking" 
+    label: "Net Banking",
   },
 };
 
@@ -169,20 +164,26 @@ const OrderHistory: React.FC = () => {
   const [activeOrders, setActiveOrders] = useState<OrderDTO[]>([]);
   const [historicalOrders, setHistoricalOrders] = useState<OrderDTO[]>([]);
   const [stationData, setStationData] = useState<{ [key: number]: StationDTO }>({});
-  const [itemData, setItemData] = useState<{ [key: number]: ItemDTO }>({});
+  const [itemData, setItemData] = useState<{ [key: number]: MenuItemDTO }>({});
+  const [vendorData, setVendorData] = useState<{ [key: number]: VendorDTO }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const fetchOrdersAndData = async () => {
+      if (!userId || !accessToken) {
+        setError("Authentication required. Please log in.");
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
       try {
-        // Fetch both active and historical orders in parallel
+        // Fetch active and historical orders in parallel
         const [activeResponse, historicalResponse] = await Promise.all([
           api.get<PageResponse<OrderDTO>>("/orders/user/active", {
             params: { page: 0, size: 100 },
@@ -191,7 +192,7 @@ const OrderHistory: React.FC = () => {
           api.get<PageResponse<OrderDTO>>("/orders/user/historical", {
             params: { page: 0, size: 100 },
             headers: { Authorization: `Bearer ${accessToken}` },
-          })
+          }),
         ]);
 
         const activeOrdersData = activeResponse.data.content || [];
@@ -206,57 +207,54 @@ const OrderHistory: React.FC = () => {
         }
 
         // Fetch additional data in parallel
-        const [stationsData, itemsData] = await Promise.all([
+        const [stationsData, itemsData, vendorsData] = await Promise.all([
           fetchStationData(allOrders),
-          fetchItemData(allOrders)
+          fetchItemData(allOrders),
+          fetchVendorData(allOrders),
         ]);
 
         // Transform orders with enriched data
-        const transformedOrders = allOrders.map(order => ({
+        const transformedOrders = allOrders.map((order) => ({
           ...order,
-          items: order.items.map(item => ({
+          items: order.items.map((item) => ({
             ...item,
             itemName: itemsData[item.itemId]?.itemName || `Item #${item.itemId}`,
             category: itemsData[item.itemId]?.category,
             imageUrl: itemsData[item.itemId]?.imageUrl,
-            specialInstructions: item.specialInstructions || "No special instructions"
+            specialInstructions: item.specialInstructions || "No special instructions",
           })),
-          vendorName: "Railway Eats Vendor", // Would come from API in real app
-          trainName: stationsData[order.deliveryStationId]?.stationName 
-            ? `Express to ${stationsData[order.deliveryStationId].stationName}` 
-            : `Train #${order.trainId}`
+          vendorName: vendorsData[order.vendorId]?.businessName || `Vendor #${order.vendorId}`,
+          trainNumber: order.trainNumber || `Train #${order.trainId}`,
         }));
 
-        setActiveOrders(transformedOrders.filter(o => 
-          ["PLACED", "PENDING", "PREPARING"].includes(o.orderStatus)
-        ));
-        setHistoricalOrders(transformedOrders.filter(o => 
-          ["DELIVERED", "CANCELLED"].includes(o.orderStatus)
-        ));
+        setActiveOrders(transformedOrders.filter((o) => ["PLACED", "PENDING", "PREPARING"].includes(o.orderStatus)));
+        setHistoricalOrders(transformedOrders.filter((o) => ["DELIVERED", "CANCELLED"].includes(o.orderStatus)));
         setStationData(stationsData);
         setItemData(itemsData);
+        setVendorData(vendorsData);
       } catch (err: any) {
         console.error("Order fetch error:", err);
         setError(err.response?.data?.message || "Failed to fetch orders. Please try again later.");
       } finally {
         setLoading(false);
-        setIsRefreshing(false);
       }
     };
 
     const fetchStationData = async (orders: OrderDTO[]) => {
-      const stationIds = [...new Set(orders.map(o => o.deliveryStationId))];
+      const stationIds = [...new Set(orders.map((o) => o.deliveryStationId))];
       const existingStations = Object.keys(stationData).map(Number);
-      const newStationIds = stationIds.filter(id => !existingStations.includes(id));
-      
+      const newStationIds = stationIds.filter((id) => !existingStations.includes(id));
+
       if (newStationIds.length === 0) return stationData;
 
       try {
         const responses = await Promise.all(
-          newStationIds.map(id => 
-            api.get<StationDTO>(`/stations/${id}`, {
-              headers: { Authorization: `Bearer ${accessToken}` }
-            }).catch(() => null) // Gracefully handle failures
+          newStationIds.map((id) =>
+            api
+              .get<StationDTO>(`/stations/${id}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              })
+              .catch(() => null)
           )
         );
 
@@ -275,18 +273,20 @@ const OrderHistory: React.FC = () => {
     };
 
     const fetchItemData = async (orders: OrderDTO[]) => {
-      const itemIds = [...new Set(orders.flatMap(o => o.items.map(i => i.itemId)))];
+      const itemIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.itemId)))];
       const existingItems = Object.keys(itemData).map(Number);
-      const newItemIds = itemIds.filter(id => !existingItems.includes(id));
-      
+      const newItemIds = itemIds.filter((id) => !existingItems.includes(id));
+
       if (newItemIds.length === 0) return itemData;
 
       try {
         const responses = await Promise.all(
-          newItemIds.map(id => 
-            api.get<ItemDTO>(`/items/${id}`, {
-              headers: { Authorization: `Bearer ${accessToken}` }
-            }).catch(() => null) // Gracefully handle failures
+          newItemIds.map((id) =>
+            api
+              .get<MenuItemDTO>(`/menu/items/${id}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              })
+              .catch(() => null)
           )
         );
 
@@ -295,7 +295,7 @@ const OrderHistory: React.FC = () => {
             acc[newItemIds[index]] = res.data;
           }
           return acc;
-        }, {} as { [key: number]: ItemDTO });
+        }, {} as { [key: number]: MenuItemDTO });
 
         return { ...itemData, ...newItems };
       } catch (err) {
@@ -304,116 +304,137 @@ const OrderHistory: React.FC = () => {
       }
     };
 
-    if (userId && accessToken) {
-      fetchOrdersAndData();
-    }
-  }, [userId, accessToken, isRefreshing]);
+    const fetchVendorData = async (orders: OrderDTO[]) => {
+      const vendorIds = [...new Set(orders.map((o) => o.vendorId))];
+      const existingVendors = Object.keys(vendorData).map(Number);
+      const newVendorIds = vendorIds.filter((id) => !existingVendors.includes(id));
 
-  const refreshOrders = () => {
-    setIsRefreshing(true);
-  };
+      if (newVendorIds.length === 0) return vendorData;
+
+      try {
+        const responses = await Promise.all(
+          newVendorIds.map((id) =>
+            api
+              .get<VendorDTO>(`/vendors/${id}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              })
+              .catch(() => null)
+          )
+        );
+
+        const newVendors = responses.reduce((acc, res, index) => {
+          if (res && res.data) {
+            acc[newVendorIds[index]] = res.data;
+          }
+          return acc;
+        }, {} as { [key: number]: VendorDTO });
+
+        return { ...vendorData, ...newVendors };
+      } catch (err) {
+        console.error("Failed to fetch some vendors:", err);
+        return vendorData;
+      }
+    };
+
+    fetchOrdersAndData();
+  }, [userId, accessToken]); // Removed isRefreshing from dependencies
 
   const generateInvoice = (order: OrderDTO) => {
     const doc = new jsPDF({
       orientation: "portrait",
       unit: "mm",
-      format: "a4"
+      format: "a4",
     });
 
-    // Add logo and header
     doc.setFontSize(22);
     doc.setTextColor(30, 64, 175);
     doc.setFont("helvetica", "bold");
     doc.text("RAILWAY EATS", 105, 20, { align: "center" });
-    
+
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
     doc.setFont("helvetica", "normal");
     doc.text("Food Delivery On The Go", 105, 26, { align: "center" });
-    
-    // Invoice title
+
     doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
     doc.text(`INVOICE #${order.orderId}`, 14, 40);
-    
-    // Order details
+
     doc.setFontSize(10);
     doc.text(`Date: ${formatDate(order.deliveryTime, true)}`, 14, 48);
     doc.text(`Customer ID: ${order.customerId}`, 14, 52);
-    
-    // Delivery information
+
     doc.setFontSize(12);
     doc.setTextColor(30, 64, 175);
     doc.text("Delivery Information", 14, 62);
-    
+
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     const station = stationData[order.deliveryStationId];
-    doc.text(`Station: ${station ? `${station.stationName} (${station.stationCode})` : `Station #${order.deliveryStationId}`}`, 14, 68);
-    doc.text(`Train: ${order.trainName || `Train #${order.trainId}`}`, 14, 72);
+    doc.text(
+      `Station: ${station ? `${station.stationName} (${station.stationCode})` : `Station #${order.deliveryStationId}`}`,
+      14,
+      68
+    );
+    doc.text(`Train: ${order.trainNumber || `Train #${order.trainId}`}`, 14, 72);
     doc.text(`Coach/Seat: ${order.coachNumber}/${order.seatNumber}`, 14, 76);
     doc.text(`Delivery Time: ${formatDate(order.deliveryTime, true)}`, 14, 80);
-    
+    doc.text(`Vendor: ${order.vendorName || `Vendor #${order.vendorId}`}`, 14, 84);
+
     if (order.deliveryInstructions) {
-      doc.text(`Instructions: ${order.deliveryInstructions}`, 14, 84);
+      doc.text(`Instructions: ${order.deliveryInstructions}`, 14, 88);
     }
 
-    // Items table
     doc.setFontSize(12);
     doc.setTextColor(30, 64, 175);
-    doc.text("Order Items", 14, 94);
-    
-    const headers = [
-      ["No.", "Item", "Qty", "Unit Price", "Total", "Notes"]
-    ];
-    
+    doc.text("Order Items", 14, 98);
+
+    const headers = [["No.", "Item", "Qty", "Unit Price", "Total", "Notes"]];
     const data = order.items.map((item, index) => [
       index + 1,
       item.itemName,
       item.quantity,
       `₹${item.unitPrice.toFixed(2)}`,
       `₹${(item.quantity * item.unitPrice).toFixed(2)}`,
-      item.specialInstructions || "-"
+      item.specialInstructions || "-",
     ]);
-    
+
     (doc as any).autoTable({
-      startY: 98,
+      startY: 102,
       head: headers,
       body: data,
       theme: "grid",
       headStyles: {
         fillColor: [30, 64, 175],
         textColor: 255,
-        fontStyle: "bold"
+        fontStyle: "bold",
       },
       columnStyles: {
-        0: { cellWidth: 10 }, // No.
-        1: { cellWidth: 50 }, // Item
-        2: { cellWidth: 15 }, // Qty
-        3: { cellWidth: 25 }, // Unit Price
-        4: { cellWidth: 25 }, // Total
-        5: { cellWidth: 50 }  // Notes
+        0: { cellWidth: 10 },
+        1: { cellWidth: 50 },
+        2: { cellWidth: 15 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 50 },
       },
       styles: {
         fontSize: 9,
         cellPadding: 3,
-        overflow: "linebreak"
-      }
+        overflow: "linebreak",
+      },
     });
 
-    // Summary section
     const finalY = (doc as any).lastAutoTable.finalY + 10;
-    
     doc.setFontSize(12);
     doc.setTextColor(30, 64, 175);
     doc.text("Order Summary", 14, finalY);
-    
+
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     doc.text(`Subtotal: ₹${order.totalAmount.toFixed(2)}`, 150, finalY + 6, { align: "right" });
     doc.text(`Delivery Charges: ₹${order.deliveryCharges.toFixed(2)}`, 150, finalY + 12, { align: "right" });
     doc.text(`Tax (${order.taxPercentage || 5}%): ₹${order.taxAmount.toFixed(2)}`, 150, finalY + 18, { align: "right" });
-    
+
     if (order.discountAmount && order.discountAmount > 0) {
       doc.text(`Discount: -₹${order.discountAmount.toFixed(2)}`, 150, finalY + 24, { align: "right" });
       doc.setFont("helvetica", "bold");
@@ -422,27 +443,25 @@ const OrderHistory: React.FC = () => {
       doc.setFont("helvetica", "bold");
       doc.text(`Total Amount: ₹${order.finalAmount.toFixed(2)}`, 150, finalY + 24, { align: "right" });
     }
-    
-    // Payment information
+
     doc.setFont("helvetica", "normal");
     doc.setTextColor(30, 64, 175);
     doc.text("Payment Information", 14, finalY + 42);
-    
+
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     doc.text(`Method: ${paymentMethodConfig[order.paymentMethod].label}`, 14, finalY + 48);
     doc.text(`Status: ${paymentConfig[order.paymentStatus].label}`, 14, finalY + 52);
-    
+
     if (order.razorpayOrderID) {
       doc.text(`Transaction ID: ${order.razorpayOrderID}`, 14, finalY + 56);
     }
-    
-    // Footer
+
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
     doc.text("Thank you for choosing Railway Eats!", 105, 280, { align: "center" });
     doc.text("For any queries, please contact support@railwayeats.com", 105, 284, { align: "center" });
-    
+
     doc.save(`RailwayEats_Invoice_${order.orderId}.pdf`);
   };
 
@@ -480,7 +499,7 @@ const OrderHistory: React.FC = () => {
     }
   };
 
-  if (loading && !isRefreshing) {
+  if (loading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
@@ -490,7 +509,6 @@ const OrderHistory: React.FC = () => {
             <Skeleton className="h-10 w-24" />
           </div>
         </div>
-        
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-white rounded-lg shadow-sm p-6 space-y-4">
@@ -521,33 +539,18 @@ const OrderHistory: React.FC = () => {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Orders</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {activeTab === "active" 
-              ? "Your current and upcoming orders" 
-              : "Your completed order history"}
+            {activeTab === "active" ? "Your current and upcoming orders" : "Your completed order history"}
           </p>
         </div>
-        
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={refreshOrders}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              "Refresh"
-            )}
+          <Button variant="outline" size="sm" onClick={() => fetchOrdersAndData()} disabled={loading}>
+            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Refresh"}
           </Button>
-          
           <div className="inline-flex rounded-lg border border-gray-200 bg-white">
             <button
               onClick={() => setActiveTab("active")}
               className={`px-4 py-2 text-sm font-medium ${
-                activeTab === "active" 
-                  ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2" 
-                  : "text-gray-500 hover:text-gray-700"
+                activeTab === "active" ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2" : "text-gray-500 hover:text-gray-700"
               }`}
             >
               Active ({activeOrders.length})
@@ -555,9 +558,7 @@ const OrderHistory: React.FC = () => {
             <button
               onClick={() => setActiveTab("completed")}
               className={`px-4 py-2 text-sm font-medium ${
-                activeTab === "completed" 
-                  ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2" 
-                  : "text-gray-500 hover:text-gray-700"
+                activeTab === "completed" ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2" : "text-gray-500 hover:text-gray-700"
               }`}
             >
               Completed ({historicalOrders.length})
@@ -573,17 +574,8 @@ const OrderHistory: React.FC = () => {
           </div>
           <h3 className="mt-3 text-lg font-medium text-gray-900">Error loading orders</h3>
           <p className="mt-2 text-sm text-gray-500">{error}</p>
-          <Button 
-            variant="outline" 
-            className="mt-4" 
-            onClick={refreshOrders}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              "Try Again"
-            )}
+          <Button variant="outline" className="mt-4" onClick={() => fetchOrdersAndData()} disabled={loading}>
+            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Try Again"}
           </Button>
         </div>
       ) : currentOrders.length === 0 ? (
@@ -595,33 +587,25 @@ const OrderHistory: React.FC = () => {
             No {activeTab === "active" ? "active" : "completed"} orders found
           </h3>
           <p className="mt-2 text-sm text-gray-500">
-            {activeTab === "active" 
-              ? "Your upcoming orders will appear here" 
-              : "Your completed orders will appear here"}
+            {activeTab === "active" ? "Your upcoming orders will appear here" : "Your completed orders will appear here"}
           </p>
         </div>
       ) : (
         <div className="space-y-4">
           {currentOrders.map((order) => (
-            <motion.div 
+            <motion.div
               key={order.orderId}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
               className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100"
             >
-              {/* Order Header */}
               <div className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3">
-                      <h2 className="text-lg font-semibold text-gray-900">
-                        Order #{order.orderId}
-                      </h2>
-                      <Badge 
-                        variant="outline" 
-                        className={`${statusConfig[order.orderStatus].color} py-1 px-2.5`}
-                      >
+                      <h2 className="text-lg font-semibold text-gray-900">Order #{order.orderId}</h2>
+                      <Badge variant="outline" className={`${statusConfig[order.orderStatus].color} py-1 px-2.5`}>
                         <div className="flex items-center gap-1.5">
                           {statusConfig[order.orderStatus].icon}
                           <span>{statusConfig[order.orderStatus].label}</span>
@@ -632,8 +616,13 @@ const OrderHistory: React.FC = () => {
                       <IoTime className="mr-1.5" />
                       {formatDate(order.deliveryTime)}
                     </p>
+                    <p className="text-sm text-gray-500 mt-1 flex items-center">
+                      <FaMapMarkerAlt className="mr-1.5" />
+                      {stationData[order.deliveryStationId]
+                        ? `${stationData[order.deliveryStationId].stationName} (${stationData[order.deliveryStationId].stationCode})`
+                        : `Station #${order.deliveryStationId}`}
+                    </p>
                   </div>
-                  
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className="text-right">
                       <p className="text-sm text-gray-500">Total Amount</p>
@@ -642,9 +631,9 @@ const OrderHistory: React.FC = () => {
                         {order.finalAmount.toFixed(2)}
                       </p>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => toggleOrderDetails(order.orderId)}
                       className="rounded-full"
                     >
@@ -656,8 +645,6 @@ const OrderHistory: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-                
-                {/* Progress Bar - Only for active orders */}
                 {activeTab === "active" && order.orderStatus !== "CANCELLED" && (
                   <div className="mt-4">
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
@@ -665,16 +652,11 @@ const OrderHistory: React.FC = () => {
                       <span>{order.orderStatus === "DELIVERED" ? "Delivered" : "In Progress"}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full" 
-                        style={{ width: `${getOrderProgress(order.orderStatus)}%` }}
-                      ></div>
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${getOrderProgress(order.orderStatus)}%` }}></div>
                     </div>
                   </div>
                 )}
               </div>
-              
-              {/* Expanded Order Details */}
               <AnimatePresence>
                 {expandedOrderId === order.orderId && (
                   <motion.div
@@ -685,13 +667,11 @@ const OrderHistory: React.FC = () => {
                     className="border-t border-gray-100 overflow-hidden"
                   >
                     <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Delivery Information */}
                       <div className="space-y-4">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <Truck className="w-5 h-5 text-blue-600" />
                           Delivery Information
                         </h3>
-                        
                         <div className="space-y-3">
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Station</span>
@@ -710,46 +690,37 @@ const OrderHistory: React.FC = () => {
                               )}
                             </span>
                           </div>
-                          
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Train</span>
-                            <span className="text-sm font-medium">
-                              {order.trainName || `Train #${order.trainId}`}
-                            </span>
+                            <span className="text-sm font-medium">{order.trainNumber || `Train #${order.trainId}`}</span>
                           </div>
-                          
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Coach/Seat</span>
                             <span className="text-sm font-medium">
                               {order.coachNumber}/{order.seatNumber}
                             </span>
                           </div>
-                          
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Vendor</span>
+                            <span className="text-sm font-medium">{order.vendorName || `Vendor #${order.vendorId}`}</span>
+                          </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Delivery Time</span>
-                            <span className="text-sm font-medium">
-                              {formatDate(order.deliveryTime)}
-                            </span>
+                            <span className="text-sm font-medium">{formatDate(order.deliveryTime)}</span>
                           </div>
-                          
                           {order.deliveryInstructions && (
                             <div className="flex justify-between">
                               <span className="text-sm text-gray-500">Instructions</span>
-                              <span className="text-sm font-medium text-right max-w-xs">
-                                {order.deliveryInstructions}
-                              </span>
+                              <span className="text-sm font-medium text-right max-w-xs">{order.deliveryInstructions}</span>
                             </div>
                           )}
                         </div>
                       </div>
-                      
-                      {/* Order Items */}
                       <div className="space-y-4">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <MdFastfood className="w-5 h-5 text-blue-600" />
                           Order Items ({order.items.length})
                         </h3>
-                        
                         <div className="border rounded-lg divide-y">
                           {order.items.map((item) => (
                             <div key={`${order.orderId}-${item.itemId}`} className="p-3">
@@ -764,9 +735,7 @@ const OrderHistory: React.FC = () => {
                                     )}
                                   </p>
                                   {item.specialInstructions && (
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      Note: {item.specialInstructions}
-                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">Note: {item.specialInstructions}</p>
                                   )}
                                 </div>
                                 <div className="text-right">
@@ -783,14 +752,11 @@ const OrderHistory: React.FC = () => {
                           ))}
                         </div>
                       </div>
-                      
-                      {/* Payment Information */}
                       <div className="space-y-4">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <MdPayment className="w-5 h-5 text-blue-600" />
                           Payment Information
                         </h3>
-                        
                         <div className="space-y-3">
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Method</span>
@@ -801,60 +767,41 @@ const OrderHistory: React.FC = () => {
                               {paymentMethodConfig[order.paymentMethod].label}
                             </span>
                           </div>
-                          
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Status</span>
-                            <Badge 
-                              variant="outline" 
-                              className={`${paymentConfig[order.paymentStatus].color} py-1 px-2.5`}
-                            >
+                            <Badge variant="outline" className={`${paymentConfig[order.paymentStatus].color} py-1 px-2.5`}>
                               <div className="flex items-center gap-1.5">
                                 {paymentConfig[order.paymentStatus].icon}
                                 <span>{paymentConfig[order.paymentStatus].label}</span>
                               </div>
                             </Badge>
                           </div>
-                          
                           {order.razorpayOrderID && (
                             <div className="flex justify-between">
                               <span className="text-sm text-gray-500">Transaction ID</span>
-                              <span className="text-sm font-medium font-mono">
-                                {order.razorpayOrderID}
-                              </span>
+                              <span className="text-sm font-medium font-mono">{order.razorpayOrderID}</span>
                             </div>
                           )}
                         </div>
                       </div>
-                      
-                      {/* Order Summary */}
                       <div className="space-y-4">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <FaReceipt className="w-5 h-5 text-blue-600" />
                           Order Summary
                         </h3>
-                        
                         <div className="space-y-2">
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Subtotal</span>
-                            <span className="text-sm font-medium">
-                              ₹{order.totalAmount.toFixed(2)}
-                            </span>
+                            <span className="text-sm font-medium">₹{order.totalAmount.toFixed(2)}</span>
                           </div>
-                          
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Delivery Charges</span>
-                            <span className="text-sm font-medium">
-                              ₹{order.deliveryCharges.toFixed(2)}
-                            </span>
+                            <span className="text-sm font-medium">₹{order.deliveryCharges.toFixed(2)}</span>
                           </div>
-                          
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Tax ({order.taxPercentage || 5}%)</span>
-                            <span className="text-sm font-medium">
-                              ₹{order.taxAmount.toFixed(2)}
-                            </span>
+                            <span className="text-sm font-medium">₹{order.taxAmount.toFixed(2)}</span>
                           </div>
-                          
                           {order.discountAmount && order.discountAmount > 0 && (
                             <div className="flex justify-between">
                               <span className="text-sm text-gray-500">Discount</span>
@@ -863,26 +810,16 @@ const OrderHistory: React.FC = () => {
                               </span>
                             </div>
                           )}
-                          
                           <div className="pt-2 border-t border-gray-200 flex justify-between">
                             <span className="text-base font-semibold">Total Amount</span>
-                            <span className="text-base font-semibold">
-                              ₹{order.finalAmount.toFixed(2)}
-                            </span>
+                            <span className="text-base font-semibold">₹{order.finalAmount.toFixed(2)}</span>
                           </div>
                         </div>
-                        
                         <div className="pt-4 flex justify-end gap-3">
-                          <Button 
-                            variant="outline" 
-                            onClick={() => toggleOrderDetails(order.orderId)}
-                          >
+                          <Button variant="outline" onClick={() => toggleOrderDetails(order.orderId)}>
                             Close Details
                           </Button>
-                          <Button 
-                            onClick={() => generateInvoice(order)}
-                            className="gap-2"
-                          >
+                          <Button onClick={() => generateInvoice(order)} className="gap-2">
                             <FaDownload className="w-4 h-4" />
                             Download Invoice
                           </Button>
