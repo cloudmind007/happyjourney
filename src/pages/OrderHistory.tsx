@@ -1,12 +1,36 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { FaTrain, FaChair, FaRupeeSign, FaInfoCircle, FaDownload } from "react-icons/fa";
-import { MdPayment } from "react-icons/md";
-import { IoTime } from "react-icons/io5";
-import { CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
+import { 
+  FaTrain, 
+  FaChair, 
+  FaRupeeSign, 
+  FaInfoCircle, 
+  FaDownload,
+  FaMapMarkerAlt,
+  FaReceipt,
+  FaBoxOpen
+} from "react-icons/fa";
+import { MdPayment, MdFastfood } from "react-icons/md";
+import { IoTime, IoChevronDown, IoChevronUp } from "react-icons/io5";
+import { 
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  Loader2,
+  CreditCard,
+  Wallet,
+  Truck,
+  ChefHat
+} from "lucide-react";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import api from "@/utils/axios";
 import { useAuth } from "@/contexts/AuthContext";
+import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { format } from "date-fns";
 
 interface OrderItemDTO {
   itemId: number;
@@ -14,6 +38,8 @@ interface OrderItemDTO {
   quantity: number;
   unitPrice: number;
   specialInstructions: string | null;
+  category?: string;
+  imageUrl?: string | null;
 }
 
 interface OrderDTO {
@@ -30,6 +56,7 @@ interface OrderDTO {
   totalAmount: number;
   deliveryCharges: number;
   taxAmount: number;
+  taxPercentage: number;
   discountAmount: number | null;
   finalAmount: number;
   paymentStatus: "PAID" | "PENDING" | "FAILED";
@@ -37,17 +64,25 @@ interface OrderDTO {
   razorpayOrderID: string | null;
   deliveryInstructions: string | null;
   items: OrderItemDTO[];
+  vendorName?: string;
+  trainName?: string;
+  trainNumber?: string;
 }
 
 interface StationDTO {
   stationId: number;
   stationName: string;
   stationCode: string;
+  city: string;
+  state: string;
 }
 
 interface ItemDTO {
   itemId: number;
   itemName: string;
+  description: string;
+  category: string;
+  imageUrl: string | null;
 }
 
 interface PageResponse<T> {
@@ -61,59 +96,108 @@ interface PageResponse<T> {
 }
 
 const statusConfig = {
-  PLACED: { color: "bg-amber-100 text-amber-800", icon: <Clock className="w-4 h-4" /> },
-  PENDING: { color: "bg-amber-100 text-amber-800", icon: <Clock className="w-4 h-4" /> },
-  PREPARING: { color: "bg-blue-100 text-blue-800", icon: <Loader2 className="w-4 h-4 animate-spin" /> },
-  DELIVERED: { color: "bg-green-100 text-green-800", icon: <CheckCircle className="w-4 h-4" /> },
-  CANCELLED: { color: "bg-red-100 text-red-800", icon: <XCircle className="w-4 h-4" /> },
+  PLACED: { 
+    color: "bg-blue-50 text-blue-800", 
+    icon: <Clock className="w-4 h-4" />,
+    label: "Order Placed"
+  },
+  PENDING: { 
+    color: "bg-amber-50 text-amber-800", 
+    icon: <Clock className="w-4 h-4" />,
+    label: "Pending Confirmation"
+  },
+  PREPARING: { 
+    color: "bg-purple-50 text-purple-800", 
+    icon: <ChefHat className="w-4 h-4" />,
+    label: "Preparing Your Meal"
+  },
+  DELIVERED: { 
+    color: "bg-green-50 text-green-800", 
+    icon: <CheckCircle className="w-4 h-4" />,
+    label: "Delivered Successfully"
+  },
+  CANCELLED: { 
+    color: "bg-red-50 text-red-800", 
+    icon: <XCircle className="w-4 h-4" />,
+    label: "Order Cancelled"
+  },
 };
 
 const paymentConfig = {
-  PAID: { color: "bg-green-100 text-green-800", icon: <CheckCircle className="w-4 h-4" /> },
-  PENDING: { color: "bg-amber-100 text-amber-800", icon: <Clock className="w-4 h-4" /> },
-  FAILED: { color: "bg-red-100 text-red-800", icon: <XCircle className="w-4 h-4" /> },
+  PAID: { 
+    color: "bg-green-50 text-green-800", 
+    icon: <CheckCircle className="w-4 h-4" />,
+    label: "Payment Successful"
+  },
+  PENDING: { 
+    color: "bg-amber-50 text-amber-800", 
+    icon: <Clock className="w-4 h-4" />,
+    label: "Payment Pending"
+  },
+  FAILED: { 
+    color: "bg-red-50 text-red-800", 
+    icon: <XCircle className="w-4 h-4" />,
+    label: "Payment Failed"
+  },
 };
 
 const paymentMethodConfig = {
-  COD: { color: "text-red-500", icon: <MdPayment className="w-5 h-5" /> },
-  UPI: { color: "text-blue-500", icon: <MdPayment className="w-5 h-5" /> },
-  CARD: { color: "text-purple-500", icon: <MdPayment className="w-5 h-5" /> },
-  NETBANKING: { color: "text-green-500", icon: <MdPayment className="w-5 h-5" /> },
+  COD: { 
+    color: "text-red-600", 
+    icon: <Wallet className="w-5 h-5" />,
+    label: "Cash on Delivery" 
+  },
+  UPI: { 
+    color: "text-blue-600", 
+    icon: <MdPayment className="w-5 h-5" />,
+    label: "UPI Payment" 
+  },
+  CARD: { 
+    color: "text-purple-600", 
+    icon: <CreditCard className="w-5 h-5" />,
+    label: "Credit/Debit Card" 
+  },
+  NETBANKING: { 
+    color: "text-green-600", 
+    icon: <MdPayment className="w-5 h-5" />,
+    label: "Net Banking" 
+  },
 };
 
 const OrderHistory: React.FC = () => {
-  const { userId, accessToken } = useAuth(); // Ensure token is stable
+  const { userId, accessToken } = useAuth();
   const [activeOrders, setActiveOrders] = useState<OrderDTO[]>([]);
   const [historicalOrders, setHistoricalOrders] = useState<OrderDTO[]>([]);
-  const [stationNames, setStationNames] = useState<{ [key: number]: string }>({});
-  const [itemNames, setItemNames] = useState<{ [key: number]: string }>({});
+  const [stationData, setStationData] = useState<{ [key: number]: StationDTO }>({});
+  const [itemData, setItemData] = useState<{ [key: number]: ItemDTO }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    const fetchOrdersAndStations = async () => {
+    const fetchOrdersAndData = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Fetch active orders
-        const activeResponse = await api.get<PageResponse<OrderDTO>>("/orders/user/active", {
-          params: { page: 0, size: 100 },
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        // Fetch both active and historical orders in parallel
+        const [activeResponse, historicalResponse] = await Promise.all([
+          api.get<PageResponse<OrderDTO>>("/orders/user/active", {
+            params: { page: 0, size: 100 },
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }),
+          api.get<PageResponse<OrderDTO>>("/orders/user/historical", {
+            params: { page: 0, size: 100 },
+            headers: { Authorization: `Bearer ${accessToken}` },
+          })
+        ]);
+
         const activeOrdersData = activeResponse.data.content || [];
-
-        // Fetch historical orders
-        const historicalResponse = await api.get<PageResponse<OrderDTO>>("/orders/user/historical", {
-          params: { page: 0, size: 100 },
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
         const historicalOrdersData = historicalResponse.data.content || [];
-
-        // Combine all orders
         const allOrders = [...activeOrdersData, ...historicalOrdersData];
+
         if (allOrders.length === 0) {
           setActiveOrders([]);
           setHistoricalOrders([]);
@@ -121,142 +205,245 @@ const OrderHistory: React.FC = () => {
           return;
         }
 
-        // Transform orders
-        const transformedOrders = allOrders.map((order) => ({
+        // Fetch additional data in parallel
+        const [stationsData, itemsData] = await Promise.all([
+          fetchStationData(allOrders),
+          fetchItemData(allOrders)
+        ]);
+
+        // Transform orders with enriched data
+        const transformedOrders = allOrders.map(order => ({
           ...order,
-          userId: order.customerId,
-          discountAmount: order.discountAmount ?? 0,
-          items: order.items.map((item) => ({
+          items: order.items.map(item => ({
             ...item,
-            specialInstructions: item.specialInstructions || null,
+            itemName: itemsData[item.itemId]?.itemName || `Item #${item.itemId}`,
+            category: itemsData[item.itemId]?.category,
+            imageUrl: itemsData[item.itemId]?.imageUrl,
+            specialInstructions: item.specialInstructions || "No special instructions"
           })),
+          vendorName: "Railway Eats Vendor", // Would come from API in real app
+          trainName: stationsData[order.deliveryStationId]?.stationName 
+            ? `Express to ${stationsData[order.deliveryStationId].stationName}` 
+            : `Train #${order.trainId}`
         }));
 
-        // Fetch item names for uncached items
-        const itemIds = [...new Set(allOrders.flatMap((order) => order.items.map((item) => item.itemId)))];
-        const uncachedItemIds = itemIds.filter((itemId) => !itemNames[itemId]);
-        let newItemNames = { ...itemNames };
-
-        if (uncachedItemIds.length > 0) {
-          const itemPromises = uncachedItemIds.map(async (itemId) => {
-            try {
-              const response = await api.get<ItemDTO>(`/items/${itemId}`, {
-                headers: { Authorization: `Bearer ${accessToken}` },
-              });
-              return { itemId, itemName: response.data.itemName };
-            } catch (err) {
-              console.error(`Failed to fetch item ${itemId}:`, err);
-              return { itemId, itemName: `Item ${itemId}` };
-            }
-          });
-
-          const itemResults = await Promise.all(itemPromises);
-          newItemNames = {
-            ...itemNames,
-            ...itemResults.reduce((acc, { itemId, itemName }) => {
-              acc[itemId] = itemName;
-              return acc;
-            }, {} as { [key: number]: string }),
-          };
-          setItemNames(newItemNames);
-        }
-
-        // Update orders with item names
-        const ordersWithItemNames = transformedOrders.map((order) => ({
-          ...order,
-          items: order.items.map((item) => ({
-            ...item,
-            itemName: newItemNames[item.itemId] || `Item ${item.itemId}`,
-          })),
-        }));
-
-        // Fetch station names for uncached stations
-        const stationIds = [...new Set(allOrders.map((order) => order.deliveryStationId))];
-        const uncachedStationIds = stationIds.filter((stationId) => !stationNames[stationId]);
-        let newStationNames = { ...stationNames };
-
-        if (uncachedStationIds.length > 0) {
-          const stationPromises = uncachedStationIds.map(async (stationId) => {
-            try {
-              const response = await api.get<StationDTO>(`/stations/${stationId}`, {
-                headers: { Authorization: `Bearer ${accessToken}` },
-              });
-              return { stationId, stationName: `${response.data.stationName} (${response.data.stationCode})` };
-            } catch (err) {
-              console.error(`Failed to fetch station ${stationId}:`, err);
-              return { stationId, stationName: `Station ${stationId}` };
-            }
-          });
-
-          const stationResults = await Promise.all(stationPromises);
-          newStationNames = {
-            ...stationNames,
-            ...stationResults.reduce((acc, { stationId, stationName }) => {
-              acc[stationId] = stationName;
-              return acc;
-            }, {} as { [key: number]: string }),
-          };
-          setStationNames(newStationNames);
-        }
-
-        setActiveOrders(ordersWithItemNames.filter((o) => ["PLACED", "PENDING", "PREPARING"].includes(o.orderStatus)));
-        setHistoricalOrders(ordersWithItemNames.filter((o) => ["DELIVERED", "CANCELLED"].includes(o.orderStatus)));
+        setActiveOrders(transformedOrders.filter(o => 
+          ["PLACED", "PENDING", "PREPARING"].includes(o.orderStatus)
+        ));
+        setHistoricalOrders(transformedOrders.filter(o => 
+          ["DELIVERED", "CANCELLED"].includes(o.orderStatus)
+        ));
+        setStationData(stationsData);
+        setItemData(itemsData);
       } catch (err: any) {
-        setError(err.response?.data?.message || "Failed to fetch orders. Please try again.");
+        console.error("Order fetch error:", err);
+        setError(err.response?.data?.message || "Failed to fetch orders. Please try again later.");
       } finally {
         setLoading(false);
+        setIsRefreshing(false);
+      }
+    };
+
+    const fetchStationData = async (orders: OrderDTO[]) => {
+      const stationIds = [...new Set(orders.map(o => o.deliveryStationId))];
+      const existingStations = Object.keys(stationData).map(Number);
+      const newStationIds = stationIds.filter(id => !existingStations.includes(id));
+      
+      if (newStationIds.length === 0) return stationData;
+
+      try {
+        const responses = await Promise.all(
+          newStationIds.map(id => 
+            api.get<StationDTO>(`/stations/${id}`, {
+              headers: { Authorization: `Bearer ${accessToken}` }
+            }).catch(() => null) // Gracefully handle failures
+          )
+        );
+
+        const newStations = responses.reduce((acc, res, index) => {
+          if (res && res.data) {
+            acc[newStationIds[index]] = res.data;
+          }
+          return acc;
+        }, {} as { [key: number]: StationDTO });
+
+        return { ...stationData, ...newStations };
+      } catch (err) {
+        console.error("Failed to fetch some stations:", err);
+        return stationData;
+      }
+    };
+
+    const fetchItemData = async (orders: OrderDTO[]) => {
+      const itemIds = [...new Set(orders.flatMap(o => o.items.map(i => i.itemId)))];
+      const existingItems = Object.keys(itemData).map(Number);
+      const newItemIds = itemIds.filter(id => !existingItems.includes(id));
+      
+      if (newItemIds.length === 0) return itemData;
+
+      try {
+        const responses = await Promise.all(
+          newItemIds.map(id => 
+            api.get<ItemDTO>(`/items/${id}`, {
+              headers: { Authorization: `Bearer ${accessToken}` }
+            }).catch(() => null) // Gracefully handle failures
+          )
+        );
+
+        const newItems = responses.reduce((acc, res, index) => {
+          if (res && res.data) {
+            acc[newItemIds[index]] = res.data;
+          }
+          return acc;
+        }, {} as { [key: number]: ItemDTO });
+
+        return { ...itemData, ...newItems };
+      } catch (err) {
+        console.error("Failed to fetch some items:", err);
+        return itemData;
       }
     };
 
     if (userId && accessToken) {
-      fetchOrdersAndStations();
+      fetchOrdersAndData();
     }
-  }, [userId, accessToken]); // Only depend on userId and token
+  }, [userId, accessToken, isRefreshing]);
+
+  const refreshOrders = () => {
+    setIsRefreshing(true);
+  };
 
   const generateInvoice = (order: OrderDTO) => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(`Invoice #${order.orderId}`, 20, 20);
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4"
+    });
 
-    const headers = [["Item Name", "Quantity", "Unit Price", "Total", "Instructions"]];
-    const data = order.items.map((item) => [
-      item.itemName || `Item ${item.itemId}`,
+    // Add logo and header
+    doc.setFontSize(22);
+    doc.setTextColor(30, 64, 175);
+    doc.setFont("helvetica", "bold");
+    doc.text("RAILWAY EATS", 105, 20, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "normal");
+    doc.text("Food Delivery On The Go", 105, 26, { align: "center" });
+    
+    // Invoice title
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`INVOICE #${order.orderId}`, 14, 40);
+    
+    // Order details
+    doc.setFontSize(10);
+    doc.text(`Date: ${formatDate(order.deliveryTime, true)}`, 14, 48);
+    doc.text(`Customer ID: ${order.customerId}`, 14, 52);
+    
+    // Delivery information
+    doc.setFontSize(12);
+    doc.setTextColor(30, 64, 175);
+    doc.text("Delivery Information", 14, 62);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    const station = stationData[order.deliveryStationId];
+    doc.text(`Station: ${station ? `${station.stationName} (${station.stationCode})` : `Station #${order.deliveryStationId}`}`, 14, 68);
+    doc.text(`Train: ${order.trainName || `Train #${order.trainId}`}`, 14, 72);
+    doc.text(`Coach/Seat: ${order.coachNumber}/${order.seatNumber}`, 14, 76);
+    doc.text(`Delivery Time: ${formatDate(order.deliveryTime, true)}`, 14, 80);
+    
+    if (order.deliveryInstructions) {
+      doc.text(`Instructions: ${order.deliveryInstructions}`, 14, 84);
+    }
+
+    // Items table
+    doc.setFontSize(12);
+    doc.setTextColor(30, 64, 175);
+    doc.text("Order Items", 14, 94);
+    
+    const headers = [
+      ["No.", "Item", "Qty", "Unit Price", "Total", "Notes"]
+    ];
+    
+    const data = order.items.map((item, index) => [
+      index + 1,
+      item.itemName,
       item.quantity,
       `₹${item.unitPrice.toFixed(2)}`,
       `₹${(item.quantity * item.unitPrice).toFixed(2)}`,
-      item.specialInstructions || "None",
+      item.specialInstructions || "-"
     ]);
-
+    
     (doc as any).autoTable({
+      startY: 98,
       head: headers,
       body: data,
-      startY: 30,
       theme: "grid",
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [0, 102, 204] },
+      headStyles: {
+        fillColor: [30, 64, 175],
+        textColor: 255,
+        fontStyle: "bold"
+      },
+      columnStyles: {
+        0: { cellWidth: 10 }, // No.
+        1: { cellWidth: 50 }, // Item
+        2: { cellWidth: 15 }, // Qty
+        3: { cellWidth: 25 }, // Unit Price
+        4: { cellWidth: 25 }, // Total
+        5: { cellWidth: 50 }  // Notes
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        overflow: "linebreak"
+      }
     });
 
+    // Summary section
     const finalY = (doc as any).lastAutoTable.finalY + 10;
+    
     doc.setFontSize(12);
-    doc.text(`Order Date: ${formatDate(order.deliveryTime)}`, 20, finalY);
-    doc.text(`Train: ${order.trainId}, Coach: ${order.coachNumber}, Seat: ${order.seatNumber}`, 20, finalY + 10);
-    doc.text(`Delivery Station: ${stationNames[order.deliveryStationId] || order.deliveryStationId}`, 20, finalY + 20);
-    doc.text(`Total Amount: ₹${order.totalAmount.toFixed(2)}`, 20, finalY + 30);
-    doc.text(`Delivery Charges: ₹${order.deliveryCharges.toFixed(2)}`, 20, finalY + 40);
-    doc.text(`Tax: ₹${order.taxAmount.toFixed(2)}`, 20, finalY + 50);
+    doc.setTextColor(30, 64, 175);
+    doc.text("Order Summary", 14, finalY);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Subtotal: ₹${order.totalAmount.toFixed(2)}`, 150, finalY + 6, { align: "right" });
+    doc.text(`Delivery Charges: ₹${order.deliveryCharges.toFixed(2)}`, 150, finalY + 12, { align: "right" });
+    doc.text(`Tax (${order.taxPercentage || 5}%): ₹${order.taxAmount.toFixed(2)}`, 150, finalY + 18, { align: "right" });
+    
     if (order.discountAmount && order.discountAmount > 0) {
-      doc.text(`Discount: ₹${order.discountAmount.toFixed(2)}`, 20, finalY + 60);
-      doc.text(`Final Amount: ₹${order.finalAmount.toFixed(2)}`, 20, finalY + 70);
+      doc.text(`Discount: -₹${order.discountAmount.toFixed(2)}`, 150, finalY + 24, { align: "right" });
+      doc.setFont("helvetica", "bold");
+      doc.text(`Total Amount: ₹${order.finalAmount.toFixed(2)}`, 150, finalY + 32, { align: "right" });
     } else {
-      doc.text(`Final Amount: ₹${order.finalAmount.toFixed(2)}`, 20, finalY + 60);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Total Amount: ₹${order.finalAmount.toFixed(2)}`, 150, finalY + 24, { align: "right" });
     }
-    doc.text(`Payment Status: ${order.paymentStatus}`, 20, finalY + 80);
-    doc.text(`Payment Method: ${order.paymentMethod}`, 20, finalY + 90);
-    if (order.deliveryInstructions) {
-      doc.text(`Delivery Instructions: ${order.deliveryInstructions}`, 20, finalY + 100);
+    
+    // Payment information
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(30, 64, 175);
+    doc.text("Payment Information", 14, finalY + 42);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Method: ${paymentMethodConfig[order.paymentMethod].label}`, 14, finalY + 48);
+    doc.text(`Status: ${paymentConfig[order.paymentStatus].label}`, 14, finalY + 52);
+    
+    if (order.razorpayOrderID) {
+      doc.text(`Transaction ID: ${order.razorpayOrderID}`, 14, finalY + 56);
     }
-
-    doc.save(`invoice-${order.orderId}.pdf`);
+    
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Thank you for choosing Railway Eats!", 105, 280, { align: "center" });
+    doc.text("For any queries, please contact support@railwayeats.com", 105, 284, { align: "center" });
+    
+    doc.save(`RailwayEats_Invoice_${order.orderId}.pdf`);
   };
 
   const currentOrders = useMemo(
@@ -268,284 +455,323 @@ const OrderHistory: React.FC = () => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-IN", {
-      timeZone: "Asia/Kolkata",
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
+  const formatDate = (dateString: string, forPdf = false) => {
+    const date = new Date(dateString);
+    if (forPdf) {
+      return format(date, "dd MMM yyyy, hh:mm a");
+    }
+    return format(date, "PPPp");
   };
+
+  const getOrderProgress = (status: OrderDTO["orderStatus"]) => {
+    switch (status) {
+      case "PLACED":
+        return 20;
+      case "PENDING":
+        return 40;
+      case "PREPARING":
+        return 70;
+      case "DELIVERED":
+        return 100;
+      case "CANCELLED":
+        return 0;
+      default:
+        return 0;
+    }
+  };
+
+  if (loading && !isRefreshing) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-8 w-48" />
+          <div className="flex space-x-2">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+        </div>
+        
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+              <div className="flex justify-between">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-6 w-24" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Skeleton className="h-9 w-20" />
+                <Skeleton className="h-9 w-20" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4">Order History</h1>
-        <div className="flex border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab("active")}
-            className={`py-2 px-4 font-medium text-sm border-b-2 ${
-              activeTab === "active" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500"
-            }`}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Orders</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {activeTab === "active" 
+              ? "Your current and upcoming orders" 
+              : "Your completed order history"}
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={refreshOrders}
+            disabled={isRefreshing}
           >
-            Active ({activeOrders.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("completed")}
-            className={`py-2 px-4 font-medium text-sm border-b-2 ${
-              activeTab === "completed" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500"
-            }`}
-          >
-            Completed ({historicalOrders.length})
-          </button>
+            {isRefreshing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              "Refresh"
+            )}
+          </Button>
+          
+          <div className="inline-flex rounded-lg border border-gray-200 bg-white">
+            <button
+              onClick={() => setActiveTab("active")}
+              className={`px-4 py-2 text-sm font-medium ${
+                activeTab === "active" 
+                  ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2" 
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Active ({activeOrders.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("completed")}
+              className={`px-4 py-2 text-sm font-medium ${
+                activeTab === "completed" 
+                  ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2" 
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Completed ({historicalOrders.length})
+            </button>
+          </div>
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        </div>
-      ) : error ? (
-        <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+      {error ? (
+        <div className="bg-white rounded-xl shadow-sm p-6 text-center border border-red-100">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-50">
             <XCircle className="h-6 w-6 text-red-600" />
           </div>
           <h3 className="mt-3 text-lg font-medium text-gray-900">Error loading orders</h3>
           <p className="mt-2 text-sm text-gray-500">{error}</p>
+          <Button 
+            variant="outline" 
+            className="mt-4" 
+            onClick={refreshOrders}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              "Try Again"
+            )}
+          </Button>
         </div>
       ) : currentOrders.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
-            <FaInfoCircle className="h-6 w-6 text-blue-600" />
+        <div className="bg-white rounded-xl shadow-sm p-6 text-center border border-gray-100">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-50">
+            <FaBoxOpen className="h-6 w-6 text-blue-600" />
           </div>
           <h3 className="mt-3 text-lg font-medium text-gray-900">
-            No {activeTab === "active" ? "active" : "completed"} orders
+            No {activeTab === "active" ? "active" : "completed"} orders found
           </h3>
+          <p className="mt-2 text-sm text-gray-500">
+            {activeTab === "active" 
+              ? "Your upcoming orders will appear here" 
+              : "Your completed orders will appear here"}
+          </p>
         </div>
       ) : (
-        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-          {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Train</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {currentOrders.map((order) => (
-                  <React.Fragment key={order.orderId}>
-                    <tr className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">#{order.orderId}</div>
-                        <p className="text-sm text-gray-500">{formatDate(order.deliveryTime)}</p>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <FaTrain className="flex-shrink-0 mr-2 text-gray-400" />
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">Train {order.trainId}</div>
-                            <div className="text-sm text-gray-500">{order.coachNumber}/{order.seatNumber}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center w-fit ${statusConfig[order.orderStatus].color}`}>
-                          {statusConfig[order.orderStatus].icon}
-                          <span className="ml-1">{order.orderStatus}</span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 flex items-center">
-                          <FaRupeeSign className="mr-1" />
-                          {order.finalAmount.toFixed(2)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className={`mr-2 ${paymentMethodConfig[order.paymentMethod].color}`}>
-                            {paymentMethodConfig[order.paymentMethod].icon}
-                          </span>
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${paymentConfig[order.paymentStatus].color}`}>
-                            {order.paymentStatus}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => toggleOrderDetails(order.orderId)}
-                            className="text-blue-600 hover:text-blue-900 px-3 py-1 border border-blue-100 rounded-md text-sm"
-                          >
-                            View
-                          </button>
-                          {(order.orderStatus === "DELIVERED" || order.orderStatus === "CANCELLED") && (
-                            <button
-                              onClick={() => generateInvoice(order)}
-                              className="text-green-600 hover:text-green-900 px-3 py-1 border border-green-100 rounded-md text-sm flex items-center"
-                            >
-                              <FaDownload className="mr-1" /> PDF
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {expandedOrderId === order.orderId && (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-4 bg-gray-50">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                              <h3 className="text-lg font-medium text-gray-900 mb-3">Delivery Information</h3>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                  <span className="text-gray-500">Station:</span>
-                                  <span>{stationNames[order.deliveryStationId] || order.deliveryStationId}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-500">Instructions:</span>
-                                  <span>{order.deliveryInstructions || "None"}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div>
-                              <h3 className="text-lg font-medium text-gray-900 mb-3">Order Items</h3>
-                              <ul className="divide-y divide-gray-200">
-                                {order.items.map((item) => (
-                                  <li key={item.itemId} className="py-2">
-                                    <div className="flex justify-between">
-                                      <div>
-                                        <p className="font-medium">{item.itemName || `Item ${item.itemId}`}</p>
-                                        {item.specialInstructions && (
-                                          <p className="text-xs text-gray-500">Note: {item.specialInstructions}</p>
-                                        )}
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="flex items-center justify-end">
-                                          <FaRupeeSign className="mr-1" />
-                                          {(item.quantity * item.unitPrice).toFixed(2)}
-                                        </p>
-                                        <p className="text-xs text-gray-500">
-                                          {item.quantity} × ₹{item.unitPrice.toFixed(2)}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile View */}
-          <div className="md:hidden divide-y divide-gray-200">
-            {currentOrders.map((order) => (
-              <div key={order.orderId} className="p-4">
-                <div className="flex justify-between items-start">
+        <div className="space-y-4">
+          {currentOrders.map((order) => (
+            <motion.div 
+              key={order.orderId}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100"
+            >
+              {/* Order Header */}
+              <div className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row justify-between gap-4">
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900">Order #{order.orderId}</h3>
-                    <p className="text-sm text-gray-500 flex items-center mt-1">
-                      <IoTime className="mr-1" />
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        Order #{order.orderId}
+                      </h2>
+                      <Badge 
+                        variant="outline" 
+                        className={`${statusConfig[order.orderStatus].color} py-1 px-2.5`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {statusConfig[order.orderStatus].icon}
+                          <span>{statusConfig[order.orderStatus].label}</span>
+                        </div>
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1 flex items-center">
+                      <IoTime className="mr-1.5" />
                       {formatDate(order.deliveryTime)}
                     </p>
                   </div>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center ${statusConfig[order.orderStatus].color}`}>
-                    {statusConfig[order.orderStatus].icon}
-                    <span className="ml-1">{order.orderStatus}</span>
-                  </span>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="text-sm">
-                    <p className="text-gray-500">Train</p>
-                    <p className="font-medium flex items-center">
-                      <FaTrain className="mr-1" />
-                      {order.trainId}
-                    </p>
-                  </div>
-                  <div className="text-sm">
-                    <p className="text-gray-500">Seat</p>
-                    <p className="font-medium flex items-center">
-                      <FaChair className="mr-1" />
-                      {order.coachNumber}/{order.seatNumber}
-                    </p>
-                  </div>
-                  <div className="text-sm">
-                    <p className="text-gray-500">Amount</p>
-                    <p className="font-medium flex items-center">
-                      <FaRupeeSign className="mr-1" />
-                      {order.finalAmount.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="text-sm">
-                    <p className="text-gray-500">Payment</p>
-                    <p className="font-medium flex items-center">
-                      <span className={`mr-1 ${paymentMethodConfig[order.paymentMethod].color}`}>
-                        {paymentMethodConfig[order.paymentMethod].icon}
-                      </span>
-                      {order.paymentStatus}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex justify-end space-x-2">
-                  <button
-                    onClick={() => toggleOrderDetails(order.orderId)}
-                    className="text-blue-600 hover:text-blue-900 px-3 py-1 border border-blue-100 rounded-md text-sm"
-                  >
-                    {expandedOrderId === order.orderId ? "Hide" : "View"}
-                  </button>
-                  {(order.orderStatus === "DELIVERED" || order.orderStatus === "CANCELLED") && (
-                    <button
-                      onClick={() => generateInvoice(order)}
-                      className="text-green-600 hover:text-green-900 px-3 py-1 border border-green-100 rounded-md text-sm flex items-center"
+                  
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">Total Amount</p>
+                      <p className="text-lg font-semibold flex items-center justify-end">
+                        <FaRupeeSign className="mr-1" size={14} />
+                        {order.finalAmount.toFixed(2)}
+                      </p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => toggleOrderDetails(order.orderId)}
+                      className="rounded-full"
                     >
-                      <FaDownload className="mr-1" /> PDF
-                    </button>
-                  )}
+                      {expandedOrderId === order.orderId ? (
+                        <IoChevronUp className="w-5 h-5" />
+                      ) : (
+                        <IoChevronDown className="w-5 h-5" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-
+                
+                {/* Progress Bar - Only for active orders */}
+                {activeTab === "active" && order.orderStatus !== "CANCELLED" && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Order Placed</span>
+                      <span>{order.orderStatus === "DELIVERED" ? "Delivered" : "In Progress"}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full" 
+                        style={{ width: `${getOrderProgress(order.orderStatus)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Expanded Order Details */}
+              <AnimatePresence>
                 {expandedOrderId === order.orderId && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900">Delivery Info</h4>
-                        <div className="mt-2 space-y-2 text-sm">
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="border-t border-gray-100 overflow-hidden"
+                  >
+                    <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Delivery Information */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <Truck className="w-5 h-5 text-blue-600" />
+                          Delivery Information
+                        </h3>
+                        
+                        <div className="space-y-3">
                           <div className="flex justify-between">
-                            <span className="text-gray-500">Station:</span>
-                            <span>{stationNames[order.deliveryStationId] || order.deliveryStationId}</span>
+                            <span className="text-sm text-gray-500">Station</span>
+                            <span className="text-sm font-medium text-right">
+                              {stationData[order.deliveryStationId] ? (
+                                <Tooltip>
+                                  <TooltipTrigger className="text-left">
+                                    {stationData[order.deliveryStationId].stationName}
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {stationData[order.deliveryStationId].city}, {stationData[order.deliveryStationId].state}
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                `Station #${order.deliveryStationId}`
+                              )}
+                            </span>
                           </div>
+                          
                           <div className="flex justify-between">
-                            <span className="text-gray-500">Instructions:</span>
-                            <span>{order.deliveryInstructions || "None"}</span>
+                            <span className="text-sm text-gray-500">Train</span>
+                            <span className="text-sm font-medium">
+                              {order.trainName || `Train #${order.trainId}`}
+                            </span>
                           </div>
+                          
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Coach/Seat</span>
+                            <span className="text-sm font-medium">
+                              {order.coachNumber}/{order.seatNumber}
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Delivery Time</span>
+                            <span className="text-sm font-medium">
+                              {formatDate(order.deliveryTime)}
+                            </span>
+                          </div>
+                          
+                          {order.deliveryInstructions && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-500">Instructions</span>
+                              <span className="text-sm font-medium text-right max-w-xs">
+                                {order.deliveryInstructions}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900">Order Items</h4>
-                        <ul className="mt-2 space-y-3">
+                      
+                      {/* Order Items */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <MdFastfood className="w-5 h-5 text-blue-600" />
+                          Order Items ({order.items.length})
+                        </h3>
+                        
+                        <div className="border rounded-lg divide-y">
                           {order.items.map((item) => (
-                            <li key={item.itemId}>
+                            <div key={`${order.orderId}-${item.itemId}`} className="p-3">
                               <div className="flex justify-between">
                                 <div>
-                                  <p className="font-medium">{item.itemName || `Item ${item.itemId}`}</p>
+                                  <p className="font-medium">
+                                    {item.itemName}
+                                    {item.category && (
+                                      <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                        {item.category}
+                                      </span>
+                                    )}
+                                  </p>
                                   {item.specialInstructions && (
-                                    <p className="text-xs text-gray-500">Note: {item.specialInstructions}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Note: {item.specialInstructions}
+                                    </p>
                                   )}
                                 </div>
                                 <div className="text-right">
-                                  <p className="flex items-center justify-end">
-                                    <FaRupeeSign className="mr-1" />
+                                  <p className="font-medium flex items-center justify-end">
+                                    <FaRupeeSign className="mr-1" size={10} />
                                     {(item.quantity * item.unitPrice).toFixed(2)}
                                   </p>
                                   <p className="text-xs text-gray-500">
@@ -553,16 +779,121 @@ const OrderHistory: React.FC = () => {
                                   </p>
                                 </div>
                               </div>
-                            </li>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
+                      </div>
+                      
+                      {/* Payment Information */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <MdPayment className="w-5 h-5 text-blue-600" />
+                          Payment Information
+                        </h3>
+                        
+                        <div className="space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Method</span>
+                            <span className="text-sm font-medium flex items-center gap-1.5">
+                              <span className={paymentMethodConfig[order.paymentMethod].color}>
+                                {paymentMethodConfig[order.paymentMethod].icon}
+                              </span>
+                              {paymentMethodConfig[order.paymentMethod].label}
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Status</span>
+                            <Badge 
+                              variant="outline" 
+                              className={`${paymentConfig[order.paymentStatus].color} py-1 px-2.5`}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {paymentConfig[order.paymentStatus].icon}
+                                <span>{paymentConfig[order.paymentStatus].label}</span>
+                              </div>
+                            </Badge>
+                          </div>
+                          
+                          {order.razorpayOrderID && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-500">Transaction ID</span>
+                              <span className="text-sm font-medium font-mono">
+                                {order.razorpayOrderID}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Order Summary */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <FaReceipt className="w-5 h-5 text-blue-600" />
+                          Order Summary
+                        </h3>
+                        
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Subtotal</span>
+                            <span className="text-sm font-medium">
+                              ₹{order.totalAmount.toFixed(2)}
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Delivery Charges</span>
+                            <span className="text-sm font-medium">
+                              ₹{order.deliveryCharges.toFixed(2)}
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Tax ({order.taxPercentage || 5}%)</span>
+                            <span className="text-sm font-medium">
+                              ₹{order.taxAmount.toFixed(2)}
+                            </span>
+                          </div>
+                          
+                          {order.discountAmount && order.discountAmount > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-500">Discount</span>
+                              <span className="text-sm font-medium text-green-600">
+                                -₹{order.discountAmount.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                          
+                          <div className="pt-2 border-t border-gray-200 flex justify-between">
+                            <span className="text-base font-semibold">Total Amount</span>
+                            <span className="text-base font-semibold">
+                              ₹{order.finalAmount.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="pt-4 flex justify-end gap-3">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => toggleOrderDetails(order.orderId)}
+                          >
+                            Close Details
+                          </Button>
+                          <Button 
+                            onClick={() => generateInvoice(order)}
+                            className="gap-2"
+                          >
+                            <FaDownload className="w-4 h-4" />
+                            Download Invoice
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
-              </div>
-            ))}
-          </div>
+              </AnimatePresence>
+            </motion.div>
+          ))}
         </div>
       )}
     </div>
