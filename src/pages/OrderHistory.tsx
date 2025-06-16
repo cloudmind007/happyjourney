@@ -40,7 +40,7 @@ interface OrderDTO {
   seatNumber: string;
   deliveryStationId: number;
   deliveryTime: string;
-  orderStatus: "PLACED" | "PENDING" | "PREPARING" | "DISPATCHED" | "DELIVERED" | "CANCELLED"; // Added DISPATCHED
+  orderStatus: "PLACED" | "PENDING" | "PREPARING" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
   totalAmount: number;
   deliveryCharges: number;
   taxAmount: number;
@@ -103,7 +103,7 @@ const statusConfig = {
     icon: <ChefHat className="w-4 h-4" />,
     label: "Preparing Your Meal",
   },
-  DISPATCHED: { // Added DISPATCHED
+  DISPATCHED: {
     color: "bg-orange-50 text-orange-800",
     icon: <Truck className="w-4 h-4" />,
     label: "Order Dispatched",
@@ -162,7 +162,7 @@ const paymentMethodConfig = {
 };
 
 const OrderHistory: React.FC = () => {
-  const { userId, accessToken,username } = useAuth();
+  const { userId, accessToken, username } = useAuth();
   const [activeOrders, setActiveOrders] = useState<OrderDTO[]>([]);
   const [historicalOrders, setHistoricalOrders] = useState<OrderDTO[]>([]);
   const [stationData, setStationData] = useState<{ [key: number]: StationDTO }>({});
@@ -185,7 +185,6 @@ const OrderHistory: React.FC = () => {
       setError(null);
 
       try {
-        // Fetch active and historical orders in parallel
         const [activeResponse, historicalResponse] = await Promise.all([
           api.get<PageResponse<OrderDTO>>("/orders/user/active", {
             params: { page: 0, size: 100 },
@@ -196,9 +195,6 @@ const OrderHistory: React.FC = () => {
             headers: { Authorization: `Bearer ${accessToken}` },
           }),
         ]);
-
-        console.log("Active Orders Response:", activeResponse.data); // Debug log
-        console.log("Historical Orders Response:", historicalResponse.data); // Debug log
 
         const activeOrdersData = activeResponse.data.content || [];
         const historicalOrdersData = historicalResponse.data.content || [];
@@ -211,14 +207,12 @@ const OrderHistory: React.FC = () => {
           return;
         }
 
-        // Fetch additional data in parallel
         const [stationsData, itemsData, vendorsData] = await Promise.all([
           fetchStationData(allOrders),
           fetchItemData(allOrders),
           fetchVendorData(allOrders),
         ]);
 
-        // Transform orders with enriched data
         const transformedOrders = allOrders.map((order) => ({
           ...order,
           items: order.items.map((item) => ({
@@ -232,7 +226,6 @@ const OrderHistory: React.FC = () => {
           trainNumber: order.trainNumber || `Train #${order.trainId}`,
         }));
 
-        // Updated filter to include DISPATCHED
         setActiveOrders(
           transformedOrders.filter((o) => ["PLACED", "PENDING", "PREPARING", "DISPATCHED"].includes(o.orderStatus))
         );
@@ -355,65 +348,82 @@ const OrderHistory: React.FC = () => {
       format: "a4",
     });
 
-    autoTable(doc, {
-      startY: 102,
-      head: [],
-      body: [],
-    });
+    // Setting up fonts and margins
+    doc.setFont("helvetica", "normal");
+    const marginLeft = 14;
+    const marginRight = 14;
+    const pageWidth = doc.internal.pageSize.width;
+    const labelColumnWidth = 100; // Width for labels (e.g., "Subtotal")
+    let currentY = 20;
 
+    // Header
     doc.setFontSize(22);
     doc.setTextColor(30, 64, 175);
     doc.setFont("helvetica", "bold");
-    doc.text("RelSwad", 105, 20, { align: "center" });
+    doc.text("RelSwad", pageWidth / 2, currentY, { align: "center" });
+    currentY += 6;
 
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
-    doc.setFont("helvetica", "normal");
-    doc.text("Food Delivery On The Go", 105, 26, { align: "center" });
+    doc.text("Food Delivery On The Go", pageWidth / 2, currentY, { align: "center" });
+    currentY += 10;
 
+    // Order Information
     doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
-    doc.text(`ORDER #${order.orderId}`, 14, 40);
+    doc.text(`ORDER #${order.orderId}`, marginLeft, currentY);
+    currentY += 8;
 
     doc.setFontSize(10);
-    doc.text(`Date: ${formatDate(order.deliveryTime, true)}`, 14, 48);
-    doc.text(`Customer ID: ${order.customerId}`, 14, 52);
-    doc.text(`Customer Name: ${username}`, 14, 52);
+    doc.text(`Date: ${formatDate(order.deliveryTime, true)}`, marginLeft, currentY);
+    currentY += 4;
+    doc.text(`Customer ID: ${order.customerId}`, marginLeft, currentY);
+    currentY += 4;
+    doc.text(`Customer Name: ${username || "N/A"}`, marginLeft, currentY);
+    currentY += 4;
+    doc.text(`PNR: ${order.pnrNumber || "N/A"}`, marginLeft, currentY);
+    currentY += 10;
 
-
-
-    
-
+    // Delivery Information
     doc.setFontSize(12);
     doc.setTextColor(30, 64, 175);
-    doc.text("Delivery Information", 14, 62);
+    doc.text("Delivery Information", marginLeft, currentY);
+    currentY += 6;
 
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     const station = stationData[order.deliveryStationId];
     doc.text(
       `Station: ${station ? `${station.stationName} (${station.stationCode})` : `Station #${order.deliveryStationId}`}`,
-      14,
-      68
+      marginLeft,
+      currentY
     );
-    doc.text(`PNR: ${order.pnrNumber || `PNR #${order.pnrNumber}`}`, 14, 72);
-    doc.text(`Train: ${order.trainNumber || `Train #${order.trainId}`}`, 14, 72);
-    doc.text(`Coach/Seat: ${order.coachNumber}/${order.seatNumber}`, 14, 76);
-    doc.text(`Delivery Time: ${formatDate(order.deliveryTime, true)}`, 14, 80);
-    doc.text(`Vendor ${order.vendorName || `Vendor #${order.vendorId}`}`, 14, 84);
-
+    currentY += 4;
+    doc.text(`Train: ${order.trainNumber || `Train #${order.trainId}`}`, marginLeft, currentY);
+    currentY += 4;
+    doc.text(`Coach/Seat: ${order.coachNumber}/${order.seatNumber}`, marginLeft, currentY);
+    currentY += 4;
+    doc.text(`Delivery Time: ${formatDate(order.deliveryTime, true)}`, marginLeft, currentY);
+    currentY += 4;
+    doc.text(`Vendor: ${order.vendorName || `Vendor #${order.vendorId}`}`, marginLeft, currentY);
+    currentY += 4;
     if (order.deliveryInstructions) {
-      doc.text(`Instructions: ${order.deliveryInstructions}`, 14, 88);
+      doc.text(`Instructions: ${order.deliveryInstructions}`, marginLeft, currentY, { maxWidth: 170 });
+      currentY += 6 + Math.ceil(doc.getTextWidth(`Instructions: ${order.deliveryInstructions}`) / 170) * 5;
+    } else {
+      currentY += 2;
     }
 
+    // Order Items
     doc.setFontSize(12);
     doc.setTextColor(30, 64, 175);
-    doc.text("Order Items", 14, 98);
+    doc.text("Order Items", marginLeft, currentY);
+    currentY += 6;
 
     const headers = [["No.", "Item", "Qty", "Unit Price", "Total", "Notes"]];
     const data = order.items.map((item, index) => [
       index + 1,
-      item.itemName,
+      item.itemName || `Item #${item.itemId}`,
       item.quantity,
       `₹${item.unitPrice.toFixed(2)}`,
       `₹${(item.quantity * item.unitPrice).toFixed(2)}`,
@@ -421,7 +431,7 @@ const OrderHistory: React.FC = () => {
     ]);
 
     autoTable(doc, {
-      startY: 102,
+      startY: currentY,
       head: headers,
       body: data,
       theme: "grid",
@@ -429,14 +439,15 @@ const OrderHistory: React.FC = () => {
         fillColor: [30, 64, 175],
         textColor: 255,
         fontStyle: "bold",
+        fontSize: 9,
       },
       columnStyles: {
         0: { cellWidth: 10 },
-        1: { cellWidth: 50 },
+        1: { cellWidth: 60 },
         2: { cellWidth: 15 },
         3: { cellWidth: 25 },
         4: { cellWidth: 25 },
-        5: { cellWidth: 50 },
+        5: { cellWidth: 55 },
       },
       styles: {
         fontSize: 9,
@@ -445,43 +456,59 @@ const OrderHistory: React.FC = () => {
       },
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    currentY = (doc as any).lastAutoTable.finalY + 10;
+
+    // Order Summary
     doc.setFontSize(12);
     doc.setTextColor(30, 64, 175);
-    doc.text("Order Summary", 14, finalY);
+    doc.text("Order Summary", marginLeft, currentY);
+    currentY += 6;
 
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    doc.text(`Subtotal: ₹${order.totalAmount.toFixed(2)}`, 150, finalY + 6, { align: "right" });
-    doc.text(`Delivery Charges: ₹${order.deliveryCharges.toFixed(2)}`, 150, finalY + 12, { align: "right" });
-    doc.text(`Tax (${order.taxPercentage || 5}%): ₹${order.taxAmount.toFixed(2)}`, 150, finalY + 18, { align: "right" });
-
+    // Label column (left-aligned)
+    doc.text("Subtotal:", pageWidth - marginRight - labelColumnWidth, currentY);
+    doc.text(`₹${order.totalAmount.toFixed(2)}`, pageWidth - marginRight, currentY, { align: "right" });
+    currentY += 6;
+    doc.text("Delivery Charges:", pageWidth - marginRight - labelColumnWidth, currentY);
+    doc.text(`₹${order.deliveryCharges.toFixed(2)}`, pageWidth - marginRight, currentY, { align: "right" });
+    currentY += 6;
+    doc.text(`Tax (${order.taxPercentage || 5}%):`, pageWidth - marginRight - labelColumnWidth, currentY);
+    doc.text(`₹${order.taxAmount.toFixed(2)}`, pageWidth - marginRight, currentY, { align: "right" });
+    currentY += 6;
     if (order.discountAmount && order.discountAmount > 0) {
-      doc.text(`Discount: -₹${order.discountAmount.toFixed(2)}`, 150, finalY + 24, { align: "right" });
-      doc.setFont("helvetica", "bold");
-      doc.text(`Total Amount: ₹${order.finalAmount.toFixed(2)}`, 150, finalY + 32, { align: "right" });
-    } else {
-      doc.setFont("helvetica", "bold");
-      doc.text(`Total Amount: ₹${order.finalAmount.toFixed(2)}`, 150, finalY + 24, { align: "right" });
+      doc.text("Discount:", pageWidth - marginRight - labelColumnWidth, currentY);
+      doc.text(`-₹${order.discountAmount.toFixed(2)}`, pageWidth - marginRight, currentY, { align: "right" });
+      currentY += 6;
     }
+    doc.setFont("helvetica", "bold");
+    doc.text("Total Amount:", pageWidth - marginRight - labelColumnWidth, currentY);
+    doc.text(`₹${order.finalAmount.toFixed(2)}`, pageWidth - marginRight, currentY, { align: "right" });
+    currentY += 10;
 
+    // Payment Information
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
     doc.setTextColor(30, 64, 175);
-    doc.text("Payment Information", 14, finalY + 42);
+    doc.text("Payment Information", marginLeft, currentY);
+    currentY += 6;
 
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    doc.text(`Method: ${paymentMethodConfig[order.paymentMethod].label}`, 14, finalY + 48);
-    doc.text(`Status: ${paymentConfig[order.paymentStatus].label}`, 14, finalY + 52);
-
+    doc.text(`Method: ${paymentMethodConfig[order.paymentMethod].label}`, marginLeft, currentY);
+    currentY += 4;
+    doc.text(`Status: ${paymentConfig[order.paymentStatus].label}`, marginLeft, currentY);
+    currentY += 4;
     if (order.razorpayOrderID) {
-      doc.text(`Transaction ID: ${order.razorpayOrderID}`, 14, finalY + 56);
+      doc.text(`Transaction ID: ${order.razorpayOrderID}`, marginLeft, currentY);
+      currentY += 4;
     }
 
+    // Footer
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text("Thank you for choosing RelSwad!", 105, 280, { align: "center" });
-    doc.text("For any queries, please contact support@railway.com", 105, 284, { align: "center" });
+    doc.text("Thank you for choosing RelSwad!", pageWidth / 2, 280, { align: "center" });
+    doc.text("For any queries, please contact support@railway.com", pageWidth / 2, 284, { align: "center" });
 
     doc.save(`RelSwad_Invoice_${order.orderId}.pdf`);
   };
@@ -511,7 +538,7 @@ const OrderHistory: React.FC = () => {
         return 40;
       case "PREPARING":
         return 70;
-      case "DISPATCHED": // Added DISPATCHED
+      case "DISPATCHED":
         return 85;
       case "DELIVERED":
         return 100;
