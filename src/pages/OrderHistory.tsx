@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  FaTrain,
-  FaChair,
   FaRupeeSign,
-  FaInfoCircle,
   FaDownload,
   FaMapMarkerAlt,
   FaReceipt,
@@ -13,7 +10,7 @@ import { MdPayment, MdFastfood } from "react-icons/md";
 import { IoTime, IoChevronDown, IoChevronUp } from "react-icons/io5";
 import { CheckCircle, XCircle, Clock, Loader2, CreditCard, Wallet, Truck, ChefHat } from "lucide-react";
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable"; // Correct import for jspdf-autotable
+import autoTable from "jspdf-autotable";
 import api from "@/utils/axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -43,7 +40,7 @@ interface OrderDTO {
   seatNumber: string;
   deliveryStationId: number;
   deliveryTime: string;
-  orderStatus: "PLACED" | "PENDING" | "PREPARING" | "DELIVERED" | "CANCELLED";
+  orderStatus: "PLACED" | "PENDING" | "PREPARING" | "DISPATCHED" | "DELIVERED" | "CANCELLED"; // Added DISPATCHED
   totalAmount: number;
   deliveryCharges: number;
   taxAmount: number;
@@ -106,6 +103,11 @@ const statusConfig = {
     icon: <ChefHat className="w-4 h-4" />,
     label: "Preparing Your Meal",
   },
+  DISPATCHED: { // Added DISPATCHED
+    color: "bg-orange-50 text-orange-800",
+    icon: <Truck className="w-4 h-4" />,
+    label: "Order Dispatched",
+  },
   DELIVERED: {
     color: "bg-green-50 text-green-800",
     icon: <CheckCircle className="w-4 h-4" />,
@@ -160,7 +162,7 @@ const paymentMethodConfig = {
 };
 
 const OrderHistory: React.FC = () => {
-  const { userId, accessToken } = useAuth();
+  const { userId, accessToken,username } = useAuth();
   const [activeOrders, setActiveOrders] = useState<OrderDTO[]>([]);
   const [historicalOrders, setHistoricalOrders] = useState<OrderDTO[]>([]);
   const [stationData, setStationData] = useState<{ [key: number]: StationDTO }>({});
@@ -195,6 +197,9 @@ const OrderHistory: React.FC = () => {
           }),
         ]);
 
+        console.log("Active Orders Response:", activeResponse.data); // Debug log
+        console.log("Historical Orders Response:", historicalResponse.data); // Debug log
+
         const activeOrdersData = activeResponse.data.content || [];
         const historicalOrdersData = historicalResponse.data.content || [];
         const allOrders = [...activeOrdersData, ...historicalOrdersData];
@@ -227,8 +232,12 @@ const OrderHistory: React.FC = () => {
           trainNumber: order.trainNumber || `Train #${order.trainId}`,
         }));
 
-        setActiveOrders(transformedOrders.filter((o) => ["PLACED", "PENDING", "PREPARING"].includes(o.orderStatus)));
+        // Updated filter to include DISPATCHED
+        setActiveOrders(
+          transformedOrders.filter((o) => ["PLACED", "PENDING", "PREPARING", "DISPATCHED"].includes(o.orderStatus))
+        );
         setHistoricalOrders(transformedOrders.filter((o) => ["DELIVERED", "CANCELLED"].includes(o.orderStatus)));
+
         setStationData(stationsData);
         setItemData(itemsData);
         setVendorData(vendorsData);
@@ -331,7 +340,7 @@ const OrderHistory: React.FC = () => {
 
         return { ...vendorData, ...newVendors };
       } catch (err) {
-        console.error("Failed to fetch some vendors:", err);
+        console.error("Failed to fetch vendors:", err);
         return vendorData;
       }
     };
@@ -346,7 +355,6 @@ const OrderHistory: React.FC = () => {
       format: "a4",
     });
 
-    // Register autoTable with jsPDF
     autoTable(doc, {
       startY: 102,
       head: [],
@@ -356,7 +364,7 @@ const OrderHistory: React.FC = () => {
     doc.setFontSize(22);
     doc.setTextColor(30, 64, 175);
     doc.setFont("helvetica", "bold");
-    doc.text("RAILWAY EATS", 105, 20, { align: "center" });
+    doc.text("RelSwad", 105, 20, { align: "center" });
 
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
@@ -365,11 +373,16 @@ const OrderHistory: React.FC = () => {
 
     doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
-    doc.text(`INVOICE #${order.orderId}`, 14, 40);
+    doc.text(`ORDER #${order.orderId}`, 14, 40);
 
     doc.setFontSize(10);
     doc.text(`Date: ${formatDate(order.deliveryTime, true)}`, 14, 48);
     doc.text(`Customer ID: ${order.customerId}`, 14, 52);
+    doc.text(`Customer Name: ${username}`, 14, 52);
+
+
+
+    
 
     doc.setFontSize(12);
     doc.setTextColor(30, 64, 175);
@@ -383,10 +396,11 @@ const OrderHistory: React.FC = () => {
       14,
       68
     );
+    doc.text(`PNR: ${order.pnrNumber || `PNR #${order.pnrNumber}`}`, 14, 72);
     doc.text(`Train: ${order.trainNumber || `Train #${order.trainId}`}`, 14, 72);
     doc.text(`Coach/Seat: ${order.coachNumber}/${order.seatNumber}`, 14, 76);
     doc.text(`Delivery Time: ${formatDate(order.deliveryTime, true)}`, 14, 80);
-    doc.text(`Vendor: ${order.vendorName || `Vendor #${order.vendorId}`}`, 14, 84);
+    doc.text(`Vendor ${order.vendorName || `Vendor #${order.vendorId}`}`, 14, 84);
 
     if (order.deliveryInstructions) {
       doc.text(`Instructions: ${order.deliveryInstructions}`, 14, 88);
@@ -466,10 +480,10 @@ const OrderHistory: React.FC = () => {
 
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text("Thank you for choosing Railway Eats!", 105, 280, { align: "center" });
-    doc.text("For any queries, please contact support@railwayeats.com", 105, 284, { align: "center" });
+    doc.text("Thank you for choosing RelSwad!", 105, 280, { align: "center" });
+    doc.text("For any queries, please contact support@railway.com", 105, 284, { align: "center" });
 
-    doc.save(`RailwayEats_Invoice_${order.orderId}.pdf`);
+    doc.save(`RelSwad_Invoice_${order.orderId}.pdf`);
   };
 
   const currentOrders = useMemo(
@@ -497,6 +511,8 @@ const OrderHistory: React.FC = () => {
         return 40;
       case "PREPARING":
         return 70;
+      case "DISPATCHED": // Added DISPATCHED
+        return 85;
       case "DELIVERED":
         return 100;
       case "CANCELLED":
@@ -550,7 +566,7 @@ const OrderHistory: React.FC = () => {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Orders</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {activeTab === "active" ? "Your current and upcoming orders" : "Your completed order history"}
+            {activeTab === "active" ? "Your current and upcoming orders" : "Your completed order"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -561,7 +577,9 @@ const OrderHistory: React.FC = () => {
             <button
               onClick={() => setActiveTab("active")}
               className={`px-4 py-2 text-sm font-medium ${
-                activeTab === "active" ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2" : "text-gray-500 hover:text-gray-700"
+                activeTab === "active"
+                  ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
               Active ({activeOrders.length})
@@ -569,7 +587,9 @@ const OrderHistory: React.FC = () => {
             <button
               onClick={() => setActiveTab("completed")}
               className={`px-4 py-2 text-sm font-medium ${
-                activeTab === "completed" ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2" : "text-gray-500 hover:text-gray-700"
+                activeTab === "completed"
+                  ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
               Completed ({historicalOrders.length})
@@ -663,7 +683,10 @@ const OrderHistory: React.FC = () => {
                       <span>{order.orderStatus === "DELIVERED" ? "Delivered" : "In Progress"}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${getOrderProgress(order.orderStatus)}%` }}></div>
+                      <div
+                        className="bg-blue-600 h-2 rounded-full"
+                        style={{ width: `${getOrderProgress(order.orderStatus)}%` }}
+                      ></div>
                     </div>
                   </div>
                 )}
@@ -850,4 +873,4 @@ const OrderHistory: React.FC = () => {
   );
 };
 
-export default OrderHistory
+export default OrderHistory;

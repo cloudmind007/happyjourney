@@ -31,6 +31,7 @@ import OrderConfirmation from "./pages/OrderConfirmation";
 
 const App = () => {
   return (
+    
     <AuthProvider>
       <BrowserRouter>
         <Routes>

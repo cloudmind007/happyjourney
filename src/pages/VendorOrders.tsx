@@ -21,6 +21,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 interface OrderItemDTO {
   itemId: number;
@@ -42,14 +45,14 @@ interface OrderDTO {
   seatNumber: string;
   deliveryStationId: number;
   deliveryTime: string;
-  orderStatus: "PENDING" | "PREPARING" | "DELIVERED" | "CANCELLED" | "PLACED";
+  orderStatus: "PLACED" | "PENDING" | "PREPARING" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
   totalAmount: number;
   deliveryCharges: number;
   taxAmount: number;
   taxPercentage?: number;
   discountAmount: number | null;
   finalAmount: number;
-  paymentStatus: "PAID" | "PENDING" | "FAILED";
+  paymentStatus: "PENDING" | "CAPTURED" | "COMPLETED" | "FAILED" | "PROCESSING";
   paymentMethod: "COD" | "UPI" | "CARD" | "NETBANKING";
   razorpayOrderID: string | null;
   deliveryInstructions: string | null;
@@ -105,6 +108,11 @@ const statusConfig = {
     icon: <ChefHat className="w-4 h-4" />,
     label: "Preparing Your Meal",
   },
+  DISPATCHED: {
+    color: "bg-indigo-50 text-indigo-800",
+    icon: <Truck className="w-4 h-4" />,
+    label: "Dispatched",
+  },
   DELIVERED: {
     color: "bg-green-50 text-green-800",
     icon: <CheckCircle className="w-4 h-4" />,
@@ -118,20 +126,30 @@ const statusConfig = {
 };
 
 const paymentConfig = {
-  PAID: {
-    color: "bg-green-50 text-green-800",
-    icon: <CheckCircle className="w-4 h-4" />,
-    label: "Payment Successful",
-  },
   PENDING: {
     color: "bg-amber-50 text-amber-800",
     icon: <Clock className="w-4 h-4" />,
     label: "Payment Pending",
   },
+  CAPTURED: {
+    color: "bg-blue-50 text-blue-800",
+    icon: <CheckCircle className="w-4 h-4" />,
+    label: "Payment Captured",
+  },
+  COMPLETED: {
+    color: "bg-green-50 text-green-800",
+    icon: <CheckCircle className="w-4 h-4" />,
+    label: "Payment Completed",
+  },
   FAILED: {
     color: "bg-red-50 text-red-800",
     icon: <XCircle className="w-4 h-4" />,
     label: "Payment Failed",
+  },
+  PROCESSING: {
+    color: "bg-gray-50 text-gray-800",
+    icon: <Loader2 className="w-4 h-4 animate-spin" />,
+    label: "Payment Processing",
   },
 };
 
@@ -169,6 +187,8 @@ const VendorOrders: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
+  const [statusRemarks, setStatusRemarks] = useState<{ [key: number]: string }>({});
+  const [codRemarks, setCodRemarks] = useState<{ [key: number]: string }>({});
 
   useEffect(() => {
     const fetchOrdersAndData = async () => {
@@ -221,7 +241,9 @@ const VendorOrders: React.FC = () => {
                 .then((res) => ({ [id]: res.data }))
                 .catch((err) => {
                   console.error(`Failed to fetch station ${id}:`, err);
-                  return { [id]: { stationId: id, stationName: `Station #${id}`, stationCode: "Unknown", city: "Unknown", state: "Unknown" } };
+                  return {
+                    [id]: { stationId: id, stationName: `Station #${id}`, stationCode: "Unknown", city: "Unknown", state: "Unknown" },
+                  };
                 })
             )
           ).then((results) => Object.assign({}, ...results)),
@@ -232,7 +254,9 @@ const VendorOrders: React.FC = () => {
                 .then((res) => ({ [id]: res.data }))
                 .catch((err) => {
                   console.error(`Failed to fetch item ${id}:`, err);
-                  return { [id]: { itemId: id, itemName: `Item #${id}`, description: "Unknown", category: "Unknown", imageUrl: null } };
+                  return {
+                    [id]: { itemId: id, itemName: `Item #${id}`, description: "Unknown", category: "Unknown", imageUrl: null },
+                  };
                 })
             )
           ).then((results) => Object.assign({}, ...results)),
@@ -274,7 +298,9 @@ const VendorOrders: React.FC = () => {
 
         console.log("Transformed Orders:", transformedOrders);
 
-        setActiveOrders(transformedOrders.filter((o) => ["PLACED", "PENDING", "PREPARING"].includes(o.orderStatus)));
+        setActiveOrders(
+          transformedOrders.filter((o) => ["PLACED", "PENDING", "PREPARING", "DISPATCHED"].includes(o.orderStatus))
+        );
         setHistoricalOrders(transformedOrders.filter((o) => ["DELIVERED", "CANCELLED"].includes(o.orderStatus)));
       } catch (err: any) {
         console.error("Order fetch error:", err);
@@ -286,6 +312,114 @@ const VendorOrders: React.FC = () => {
 
     fetchOrdersAndData();
   }, [userId, accessToken]);
+
+  const updateOrderStatus = async (orderId: number, status: OrderDTO["orderStatus"], remarks: string) => {
+    if (!userId || !accessToken) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Authentication required.",
+      });
+      return;
+    }
+
+    try {
+      const response = await api.put<OrderDTO>(
+        `/orders/${orderId}/status`,
+        {},
+        {
+          params: {
+            status,
+            remarks: remarks || "",
+            updatedById: userId,
+          },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+
+      // Update the order in state
+      setActiveOrders((prev) =>
+        prev.map((order) =>
+          order.orderId === orderId ? { ...order, orderStatus: response.data.orderStatus } : order
+        )
+      );
+      setHistoricalOrders((prev) =>
+        prev.map((order) =>
+          order.orderId === orderId ? { ...order, orderStatus: response.data.orderStatus } : order
+        )
+      );
+
+      // Move order to historical if DELIVERED
+      if (status === "DELIVERED") {
+        setActiveOrders((prev) => prev.filter((order) => order.orderId !== orderId));
+        setHistoricalOrders((prev) => [
+          ...prev,
+          { ...activeOrders.find((o) => o.orderId === orderId)!, orderStatus: "DELIVERED" },
+        ]);
+      }
+
+      toast({
+        title: "Success",
+        description: `Order #${orderId} status updated to ${status}.`,
+      });
+    } catch (err: any) {
+      console.error(`Failed to update status for order ${orderId}:`, err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.response?.data?.message || "Failed to update order status.",
+      });
+    }
+  };
+
+  const markCodPaymentCompleted = async (orderId: number, remarks: string) => {
+    if (!userId || !accessToken) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Authentication required.",
+      });
+      return;
+    }
+
+    try {
+      await api.post(
+        `/orders/${orderId}/cod/complete`,
+        {},
+        {
+          params: {
+            updatedById: userId,
+            remarks: remarks || "",
+          },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+
+      // Update the order in state
+      setActiveOrders((prev) =>
+        prev.map((order) =>
+          order.orderId === orderId ? { ...order, paymentStatus: "COMPLETED" } : order
+        )
+      );
+      setHistoricalOrders((prev) =>
+        prev.map((order) =>
+          order.orderId === orderId ? { ...order, paymentStatus: "COMPLETED" } : order
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: `COD payment marked as completed for order #${orderId}.`,
+      });
+    } catch (err: any) {
+      console.error(`Failed to mark COD payment for order ${orderId}:`, err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.response?.data?.message || "Failed to mark COD payment as completed.",
+      });
+    }
+  };
 
   const generateInvoice = (order: OrderDTO) => {
     const doc = new jsPDF({
@@ -416,7 +550,7 @@ const VendorOrders: React.FC = () => {
     doc.text("Thank you for choosing Railway Eats!", 105, 280, { align: "center" });
     doc.text("For any queries, please contact support@railwayeats.com", 105, 284, { align: "center" });
 
-    doc.save(`RailwayEats_Invoice_${order.orderId}.pdf`);
+    doc.save(`RelSwad_Invoice_${order.orderId}.pdf`);
   };
 
   const currentOrders = useMemo(
@@ -442,7 +576,9 @@ const VendorOrders: React.FC = () => {
       case "PENDING":
         return 40;
       case "PREPARING":
-        return 70;
+        return 60;
+      case "DISPATCHED":
+        return 80;
       case "DELIVERED":
         return 100;
       case "CANCELLED":
@@ -453,7 +589,25 @@ const VendorOrders: React.FC = () => {
   };
 
   const canDownloadInvoice = (order: OrderDTO) => {
-    return order.orderStatus === "DELIVERED" || order.paymentStatus === "PAID";
+    return order.orderStatus === "DELIVERED" || order.paymentStatus === "COMPLETED";
+  };
+
+  const canUpdateStatus = (order: OrderDTO) => {
+    return ["PLACED", "PENDING", "PREPARING", "DISPATCHED"].includes(order.orderStatus);
+  };
+
+  const getAvailableStatuses = (currentStatus: OrderDTO["orderStatus"]) => {
+    const statuses: OrderDTO["orderStatus"][] = ["PREPARING", "DISPATCHED", "DELIVERED"];
+    if (currentStatus === "PLACED" || currentStatus === "PENDING") {
+      return statuses.filter((s) => s === "PREPARING");
+    }
+    if (currentStatus === "PREPARING") {
+      return statuses.filter((s) => s === "DISPATCHED");
+    }
+    if (currentStatus === "DISPATCHED") {
+      return statuses.filter((s) => s === "DELIVERED");
+    }
+    return [];
   };
 
   if (loading) {
@@ -747,9 +901,10 @@ const VendorOrders: React.FC = () => {
                                       </span>
                                     )}
                                   </p>
-                                  {item.specialInstructions && item.specialInstructions !== "No special instructions" && (
-                                    <p className="text-xs text-gray-500 mt-1">Note: {item.specialInstructions}</p>
-                                  )}
+                                  {item.specialInstructions &&
+                                    item.specialInstructions !== "No special instructions" && (
+                                      <p className="text-xs text-gray-500 mt-1">Note: {item.specialInstructions}</p>
+                                    )}
                                 </div>
                                 <div className="text-right">
                                   <p className="font-medium flex items-center justify-end">
@@ -798,6 +953,30 @@ const VendorOrders: React.FC = () => {
                               <span className="text-sm font-medium font-mono">{order.razorpayOrderID}</span>
                             </div>
                           )}
+                          {order.paymentMethod === "COD" &&
+                            order.paymentStatus === "PENDING" &&
+                            activeTab === "active" && (
+                              <div className="mt-4">
+                                <h4 className="text-sm font-medium text-gray-700">Mark COD Payment</h4>
+                                <div className="flex gap-2 mt-2">
+                                  <Input
+                                    placeholder="Optional remarks"
+                                    value={codRemarks[order.orderId] || ""}
+                                    onChange={(e) =>
+                                      setCodRemarks((prev) => ({ ...prev, [order.orderId]: e.target.value }))
+                                    }
+                                    className="max-w-xs"
+                                  />
+                                  <Button
+                                    onClick={() => markCodPaymentCompleted(order.orderId, codRemarks[order.orderId] || "")}
+                                    className="gap-2"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                    Mark Completed
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                         </div>
                       </div>
                       <div className="space-y-4">
@@ -831,6 +1010,37 @@ const VendorOrders: React.FC = () => {
                             <span className="text-base font-semibold">₹{order.finalAmount.toFixed(2)}</span>
                           </div>
                         </div>
+                        {activeTab === "active" && canUpdateStatus(order) && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium text-gray-700">Update Order Status</h4>
+                            <div className="flex gap-2 mt-2">
+                              <Select
+                                onValueChange={(value) =>
+                                  updateOrderStatus(order.orderId, value as OrderDTO["orderStatus"], statusRemarks[order.orderId] || "")
+                                }
+                              >
+                                <SelectTrigger className="w-[180px]">
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {getAvailableStatuses(order.orderStatus).map((status) => (
+                                    <SelectItem key={status} value={status}>
+                                      {statusConfig[status].label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                placeholder="Optional remarks"
+                                value={statusRemarks[order.orderId] || ""}
+                                onChange={(e) =>
+                                  setStatusRemarks((prev) => ({ ...prev, [order.orderId]: e.target.value }))
+                                }
+                                className="max-w-xs"
+                              />
+                            </div>
+                          </div>
+                        )}
                         <div className="pt-4 flex justify-end gap-3">
                           <Button variant="outline" onClick={() => toggleOrderDetails(order.orderId)}>
                             Close Details
