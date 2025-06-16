@@ -50,6 +50,11 @@ const App = () => {
             <Route path="/customers" element={<Customer />} />
             <Route path="/stations" element={<Station />} />
             <Route path="/vendor-detail/:id" element={<RestaurantDetail/>} />
+            <Route path="/callbackrequests/:id" element={<C/>} />
+            <Route path="/vendor-detail/:id" element={<RestaurantDetail/>} />
+
+
+
           </Route>
 
           <Route element={<PrivateRoute allowedRoles={["vendor"]} />}>

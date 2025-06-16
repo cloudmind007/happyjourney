@@ -40,11 +40,28 @@ interface Station {
   stationId: number;
   stationName: string;
   stationCode: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface VendorDetails {
   preparationTime: number;
   vendorName: string;
+  stationId?: number; // Added to store vendor's station ID
+}
+
+interface MenuItem {
+  itemId: number;
+  itemName: string;
+  basePrice: number;
+  description: string;
+  categoryId: number;
+  vendorId: number;
+  vegetarian: boolean;
+  available: boolean;
 }
 
 interface FormErrors {
@@ -67,7 +84,7 @@ const formSchema = z.object({
   deliveryInstructions: z.string().optional(),
 });
 
-// Mock logger (replace with pino or similar in production)
+// Mock logger
 const logger = {
   info: (msg: string, meta?: any) => console.log(`[INFO] ${msg}`, meta),
   error: (msg: string, meta?: any) => console.error(`[ERROR] ${msg}`, meta),
@@ -79,12 +96,13 @@ const FormField: React.FC<{
   id: string;
   name: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   error?: string;
   placeholder?: string;
   type?: string;
   maxLength?: number;
-}> = ({ label, id, name, value, onChange, error, placeholder, type = "text", maxLength }) => (
+  disabled?: boolean;
+}> = ({ label, id, name, value, onChange, error, placeholder, type = "text", maxLength, disabled = false }) => (
   <div>
     <Label htmlFor={id} className="text-gray-700 font-medium">
       {label}
@@ -97,7 +115,10 @@ const FormField: React.FC<{
       placeholder={placeholder}
       type={type}
       maxLength={maxLength}
-      className={`mt-1 rounded-lg ${error ? "border-red-500 focus:ring-red-500" : "focus:ring-blue-500"}`}
+      disabled={disabled}
+      className={`mt-1 rounded-lg ${disabled ? "bg-gray-100 cursor-not-allowed" : ""} ${
+        error ? "border-red-500 focus:ring-red-500" : "focus:ring-blue-500"
+      }`}
       aria-invalid={!!error}
       aria-describedby={error ? `${id}-error` : undefined}
     />
@@ -134,8 +155,9 @@ const PlaceOrder: React.FC = () => {
   const effectiveVendorId = Number(vendorId);
 
   const [cartSummary, setCartSummary] = useState<CartSummary | null>(null);
-  const [stations, setStations] = useState<Station[]>([]);
+  const [station, setStation] = useState<Station | null>(null);
   const [vendorDetails, setVendorDetails] = useState<VendorDetails | null>(null);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState<string>("");
   const [formData, setFormData] = useState({
     pnrNumber: "",
@@ -150,6 +172,7 @@ const PlaceOrder: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const maxRetries = 3;
 
   // Validate vendorId
@@ -191,7 +214,7 @@ const PlaceOrder: React.FC = () => {
       if (!cartData || !cartData.items || cartData.items.length === 0) {
         logger.warn("Empty cart detected", { cartData });
         if (retryCount < maxRetries) {
-          const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+          const delay = Math.pow(2, retryCount) * 1000;
           logger.info(`Retrying cart fetch, attempt ${retryCount + 1}`, { delay });
           setTimeout(() => setRetryCount(retryCount + 1), delay);
           return;
@@ -201,27 +224,44 @@ const PlaceOrder: React.FC = () => {
         return;
       }
 
-      setCartSummary(cartData);
-      setFormData((prev) => ({
-        ...prev,
-        pnrNumber: cartData.pnrNumber || "",
-        trainNumber: cartData.trainId?.toString() || "",
-        coachNumber: cartData.coachNumber || "",
-        seatNumber: cartData.seatNumber || "",
-        deliveryStationId: cartData.deliveryStationId?.toString() || "",
-        deliveryInstructions: cartData.deliveryInstructions || "",
+      // Fetch menu items
+      const menuItemsResponse = await api.get(`/menu/vendors/${effectiveVendorId}/items`);
+      const fetchedMenuItems = menuItemsResponse.data || [];
+      setMenuItems(fetchedMenuItems);
+
+      // Enrich cart items with itemName
+      const enrichedItems = cartData.items.map((item: CartItem) => ({
+        ...item,
+        itemName: fetchedMenuItems.find((menuItem: MenuItem) => menuItem.itemId === item.itemId)?.itemName || "Unknown Item",
       }));
 
-      // Fetch stations
-      const stationsResponse = await api.get("/stations");
-      const stationsData = stationsResponse.data.content || [];
-      setStations(stationsData);
-      logger.info("Stations fetched", { stationCount: stationsData.length });
+      setCartSummary({ ...cartData, items: enrichedItems });
 
       // Fetch vendor details
       const vendorResponse = await api.get(`/vendors/${effectiveVendorId}`);
-      setVendorDetails(vendorResponse.data);
-      logger.info("Vendor details fetched", { vendorName: vendorResponse.data.vendorName });
+      const vendorData = vendorResponse.data;
+      setVendorDetails(vendorData);
+      logger.info("Vendor details fetched", { vendorName: vendorData.vendorName });
+
+      // Fetch station details based on vendor's stationId
+      if (vendorData.stationId) {
+        const stationResponse = await api.get(`/stations/${vendorData.stationId}`);
+        const stationData = stationResponse.data;
+        setStation(stationData);
+        setFormData((prev) => ({
+          ...prev,
+          pnrNumber: cartData.pnrNumber || "",
+          trainNumber: cartData.trainId?.toString() || "",
+          coachNumber: cartData.coachNumber || "",
+          seatNumber: cartData.seatNumber || "",
+          deliveryStationId: stationData.stationId.toString() || "",
+          deliveryInstructions: cartData.deliveryInstructions || "",
+        }));
+        logger.info("Station details fetched", { stationId: stationData.stationId, stationName: stationData.stationName });
+      } else {
+        setError("Vendor station information is missing.");
+        toast.error("Vendor station information is missing.");
+      }
     } catch (err: any) {
       logger.error("Failed to fetch initial data", { error: err.message, status: err.response?.status });
       const errorMessage = err.response?.data?.message || "Failed to load cart data. Please try again.";
@@ -242,7 +282,7 @@ const PlaceOrder: React.FC = () => {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  // Calculate estimated delivery time
+  // Set estimated delivery time
   useEffect(() => {
     if (vendorDetails?.preparationTime) {
       const now = new Date();
@@ -252,18 +292,17 @@ const PlaceOrder: React.FC = () => {
         minute: "2-digit",
         hour12: true,
       });
-      setEstimatedDeliveryTime(`Estimated delivery: ${formattedTime} (${vendorDetails.preparationTime} mins)`);
+      setEstimatedDeliveryTime(`${formattedTime} (${vendorDetails.preparationTime} mins)`);
     } else {
-      setEstimatedDeliveryTime("Awaiting vendor preparation time...");
+      setEstimatedDeliveryTime("Preparation time unavailable");
     }
   }, [vendorDetails]);
 
   // Get station name for display
   const stationDisplay = useMemo(() => {
-    if (!formData.deliveryStationId) return "Not selected";
-    const station = stations.find((s) => s.stationId === Number(formData.deliveryStationId));
-    return station ? `${station.stationName} (${station.stationCode})` : "Unknown station";
-  }, [formData.deliveryStationId, stations]);
+    if (!station) return "Not selected";
+    return `${station.stationName} (${station.stationCode})`;
+  }, [station]);
 
   // Form validation
   const validateForm = useCallback(() => {
@@ -316,36 +355,47 @@ const PlaceOrder: React.FC = () => {
     setIsLoading(true);
     setError(null);
 
-    try {
-      const now = new Date();
-      const deliveryTime = new Date(now.getTime() + (vendorDetails?.preparationTime || 30) * 60 * 1000);
+    const orderPayload = {
+      vendorId: effectiveVendorId,
+      paymentMethod: formData.paymentMethod === "ONLINE" ? "RAZORPAY" : "COD",
+      deliveryTime: new Date(new Date().getTime() + (vendorDetails?.preparationTime || 30) * 60 * 1000).toISOString(),
+      pnrNumber: formData.pnrNumber,
+      trainId: Number(formData.trainNumber),
+      coachNumber: formData.coachNumber,
+      seatNumber: formData.seatNumber,
+      deliveryStationId: Number(formData.deliveryStationId),
+      deliveryInstructions: formData.deliveryInstructions,
+      items: cartSummary.items.map((item) => ({
+        itemId: item.itemId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        itemName: item.itemName,
+        specialInstructions: item.specialInstructions,
+      })),
+    };
 
-      // Prepare order payload with itemName
-      const orderPayload = {
-        vendorId: effectiveVendorId,
-        paymentMethod: formData.paymentMethod === "ONLINE" ? "RAZORPAY" : "COD",
-        deliveryTime: deliveryTime.toISOString(),
-        pnrNumber: formData.pnrNumber,
-        trainId: Number(formData.trainNumber),
-        coachNumber: formData.coachNumber,
-        seatNumber: formData.seatNumber,
-        deliveryStationId: Number(formData.deliveryStationId),
-        deliveryInstructions: formData.deliveryInstructions,
-        items: cartSummary.items.map((item) => ({
-          itemId: item.itemId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          itemName: item.itemName, // Include itemName
-          specialInstructions: item.specialInstructions,
-        })),
-      };
+    if (formData.paymentMethod === "COD") {
+      try {
+        logger.info("Creating COD order", { vendorId: effectiveVendorId });
+        const response = await api.post("/orders", orderPayload);
+        const order = response.data;
+        logger.info("COD order created successfully", { orderId: order.orderId });
+        setCartSummary(null);
+        setShowSuccessPopup(true);
+      } catch (err: any) {
+        logger.error("COD order processing failed", { error: err.message, status: err.response?.status });
+        const errorMessage = err.response?.data?.message || "Failed to process your order. Please try again.";
+        setError(errorMessage);
+        toast.error(errorMessage);
+        setIsLoading(false);
+      }
+    } else {
+      try {
+        logger.info("Initiating online order creation", { vendorId: effectiveVendorId });
+        const response = await api.post("/orders", orderPayload);
+        const order = response.data;
+        logger.info("Online order created", { orderId: order.orderId });
 
-      logger.info("Creating order", { vendorId: effectiveVendorId, paymentMethod: formData.paymentMethod });
-      const response = await api.post("/orders", orderPayload);
-      const order = response.data;
-      logger.info("Order created successfully", { orderId: order.orderId });
-
-      if (formData.paymentMethod === "ONLINE") {
         const razorpayKey = process.env.REACT_APP_RAZORPAY_KEY_ID;
         if (!razorpayKey) {
           throw new Error("Razorpay key not configured");
@@ -372,6 +422,12 @@ const PlaceOrder: React.FC = () => {
             } catch (error: any) {
               logger.error("Payment verification failed", { error: error.message });
               toast.error(error.response?.data?.message || "Payment verification failed");
+              try {
+                await api.delete(`/orders/${order.orderId}`);
+                logger.info("Order cancelled due to payment verification failure", { orderId: order.orderId });
+              } catch (cancelError: any) {
+                logger.error("Failed to cancel order after payment failure", { error: cancelError.message });
+              }
               setIsLoading(false);
             }
           },
@@ -384,36 +440,47 @@ const PlaceOrder: React.FC = () => {
             color: "#3399cc",
           },
           modal: {
-            ondismiss: () => {
+            ondismiss: async () => {
               toast.error("Payment cancelled");
-              setIsLoading(false);
               logger.warn("Payment cancelled by user");
+              try {
+                await api.delete(`/orders/${order.orderId}`);
+                logger.info("Order cancelled due to payment cancellation", { orderId: order.orderId });
+              } catch (cancelError: any) {
+                logger.error("Failed to cancel order after payment cancellation", { error: cancelError.message });
+              }
+              setIsLoading(false);
             },
           },
         };
 
         const razorpay = new (window as any).Razorpay(options);
-        razorpay.on("payment.failed", function (response: any) {
+        razorpay.on("payment.failed", async (response: any) => {
           toast.error(`Payment failed: ${response.error.description}`);
-          setIsLoading(false);
           logger.error("Payment failed", { description: response.error.description });
+          try {
+            await api.delete(`/orders/${order.orderId}`);
+            logger.info("Order cancelled due to payment failure", { orderId: order.orderId });
+          } catch (cancelError: any) {
+            logger.error("Failed to cancel order after payment failure", { error: cancelError.message });
+          }
+          setIsLoading(false);
         });
         razorpay.open();
-      } else {
-        setCartSummary(null);
-        toast.success("Order placed successfully!");
-        navigate(`/order-confirmation/${order.orderId}`);
-      }
-    } catch (err: any) {
-      logger.error("Order processing failed", { error: err.message, status: err.response?.status });
-      const errorMessage = err.response?.data?.message || "Failed to process your order. Please try again.";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      if (formData.paymentMethod !== "ONLINE") {
+      } catch (err: any) {
+        logger.error("Online order creation failed", { error: err.message, status: err.response?.status });
+        const errorMessage = err.response?.data?.message || "Failed to process your order. Please try again.";
+        setError(errorMessage);
+        toast.error(errorMessage);
         setIsLoading(false);
       }
     }
+  };
+
+  // Handle success popup close
+  const handleCloseSuccessPopup = () => {
+    setShowSuccessPopup(false);
+    navigate("/order-history");
   };
 
   // Loading state with skeleton
@@ -486,10 +553,36 @@ const PlaceOrder: React.FC = () => {
           </div>
         )}
 
+        {showSuccessPopup && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+              <h2 className="text-2xl font-bold text-green-600 mb-4">Order Placed Successfully!</h2>
+              <p className="text-gray-600 mb-6">Your order has been confirmed and will be delivered as scheduled.</p>
+              <Button
+                onClick={handleCloseSuccessPopup}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 py-2"
+              >
+                View Order History
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 bg-white rounded-2xl shadow-xl p-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-8">Delivery Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+                <FormField
+                  label="Delivery Station"
+                  id="deliveryStationId"
+                  name="deliveryStationId"
+                  value={stationDisplay}
+                  error={errors.deliveryStationId}
+                  disabled={true}
+                  placeholder="Station not available"
+                />
+              </div>
               <FormField
                 label="PNR Number"
                 id="pnrNumber"
@@ -527,27 +620,10 @@ const PlaceOrder: React.FC = () => {
                 error={errors.seatNumber}
                 placeholder="e.g., 12"
               />
-              <div className="md:col-span-2">
-                <Label htmlFor="deliveryStationId" className="text-gray-700 font-medium">
-                  Delivery Station
-                </Label>
-                <Input
-                  id="deliveryStationId"
-                  value={stationDisplay}
-                  readOnly
-                  className={`mt-1 rounded-lg bg-gray-100 cursor-not-allowed ${errors.deliveryStationId ? "border-red-500 focus:ring-red-500" : ""}`}
-                  aria-invalid={!!errors.deliveryStationId}
-                  aria-describedby={errors.deliveryStationId ? "deliveryStationId-error" : undefined}
-                />
-                {errors.deliveryStationId && (
-                  <p id="deliveryStationId-error" className="text-red-600 text-sm mt-1">
-                    {errors.deliveryStationId}
-                  </p>
-                )}
-              </div>
+              
               <div className="md:col-span-2">
                 <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-blue-800 font-medium">{estimatedDeliveryTime}</p>
+                  <p className="text-blue-800 font-medium">Estimated delivery: {estimatedDeliveryTime}</p>
                   <p className="text-sm text-blue-600 mt-1">Based on vendor's preparation time</p>
                 </div>
               </div>
@@ -585,10 +661,10 @@ const PlaceOrder: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent className="bg-white rounded-lg shadow-lg">
                     <SelectItem value="COD" className="hover:bg-gray-100">
-                      Cash on Delivery 
+                      Cash on Delivery
                     </SelectItem>
                     <SelectItem value="ONLINE" className="hover:bg-gray-100">
-                      Online Payment 
+                      Online Payment
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -613,7 +689,7 @@ const PlaceOrder: React.FC = () => {
                 <span>₹{cartSummary.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm text-gray-700">
-                <span>Tax ({((cartSummary.taxAmount / cartSummary.subtotal) * 100).toFixed(1)}%)</span>
+                <span>GST ({((cartSummary.taxAmount / cartSummary.subtotal) * 100).toFixed(1)}%)</span>
                 <span>₹{cartSummary.taxAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm text-gray-700">
@@ -634,7 +710,7 @@ const PlaceOrder: React.FC = () => {
               {isLoading ? (
                 <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
               ) : null}
-              {isLoading ? "Processing..." : "Place Order"}
+              {isLoading ? "Processing..." : formData.paymentMethod === "COD" ? "Place Order" : "Pay Now"}
             </Button>
           </div>
         </div>

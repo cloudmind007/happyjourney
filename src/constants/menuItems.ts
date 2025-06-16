@@ -31,6 +31,9 @@ export const adminMenuItems: MenuItem[] = [
   { icon: MapPin, label: "Station", path: "/stations" },
   { icon: MapPin, label: "Callback request", path: "/callbackrequests" },
   { icon: MapPin, label: "Complaints", path: "/complaints" },
+  { icon: MapPin, label: "BulkOrder", path: "/bulkorder" },
+
+
   { icon: MapPin, label: "", path: "/" },
 
 ];

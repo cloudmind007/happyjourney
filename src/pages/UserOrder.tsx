@@ -24,6 +24,12 @@ interface Category {
   displayOrder: number;
 }
 
+interface Station {
+  stationId: number;
+  stationName: string;
+  staionCode:string;
+}
+
 interface MenuItem {
   itemId: number;
   itemName: string;
