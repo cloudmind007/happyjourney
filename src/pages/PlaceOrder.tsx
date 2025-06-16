@@ -50,7 +50,7 @@ interface Station {
 interface VendorDetails {
   preparationTime: number;
   vendorName: string;
-  stationId?: number; // Added to store vendor's station ID
+  stationId?: number;
 }
 
 interface MenuItem {
@@ -172,7 +172,6 @@ const PlaceOrder: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const maxRetries = 3;
 
   // Validate vendorId
@@ -365,13 +364,6 @@ const PlaceOrder: React.FC = () => {
       seatNumber: formData.seatNumber,
       deliveryStationId: Number(formData.deliveryStationId),
       deliveryInstructions: formData.deliveryInstructions,
-      items: cartSummary.items.map((item) => ({
-        itemId: item.itemId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        itemName: item.itemName,
-        specialInstructions: item.specialInstructions,
-      })),
     };
 
     if (formData.paymentMethod === "COD") {
@@ -381,7 +373,10 @@ const PlaceOrder: React.FC = () => {
         const order = response.data;
         logger.info("COD order created successfully", { orderId: order.orderId });
         setCartSummary(null);
-        setShowSuccessPopup(true);
+        toast.success("🎉 Order placed successfully! You'll receive it soon!", {
+          duration: 3000, // Display for 3 seconds
+        });
+        navigate("/order-history");
       } catch (err: any) {
         logger.error("COD order processing failed", { error: err.message, status: err.response?.status });
         const errorMessage = err.response?.data?.message || "Failed to process your order. Please try again.";
@@ -417,7 +412,9 @@ const PlaceOrder: React.FC = () => {
                 razorpay_signature: response.razorpay_signature,
               });
               setCartSummary(null);
-              toast.success("Payment successful!");
+              toast.success("🎉 Payment successful! Your order is confirmed!", {
+                duration: 3000,
+              });
               navigate(`/order-confirmation/${order.orderId}`);
             } catch (error: any) {
               logger.error("Payment verification failed", { error: error.message });
@@ -475,12 +472,6 @@ const PlaceOrder: React.FC = () => {
         setIsLoading(false);
       }
     }
-  };
-
-  // Handle success popup close
-  const handleCloseSuccessPopup = () => {
-    setShowSuccessPopup(false);
-    navigate("/order-history");
   };
 
   // Loading state with skeleton
@@ -553,26 +544,11 @@ const PlaceOrder: React.FC = () => {
           </div>
         )}
 
-        {showSuccessPopup && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-              <h2 className="text-2xl font-bold text-green-600 mb-4">Order Placed Successfully!</h2>
-              <p className="text-gray-600 mb-6">Your order has been confirmed and will be delivered as scheduled.</p>
-              <Button
-                onClick={handleCloseSuccessPopup}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 py-2"
-              >
-                View Order History
-              </Button>
-            </div>
-          </div>
-        )}
-
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 bg-white rounded-2xl shadow-xl p-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-8">Delivery Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
+              <div className="md:col-span-2">
                 <FormField
                   label="Delivery Station"
                   id="deliveryStationId"
@@ -620,7 +596,6 @@ const PlaceOrder: React.FC = () => {
                 error={errors.seatNumber}
                 placeholder="e.g., 12"
               />
-              
               <div className="md:col-span-2">
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <p className="text-blue-800 font-medium">Estimated delivery: {estimatedDeliveryTime}</p>

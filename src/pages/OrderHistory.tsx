@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { FaTrain, FaChair, FaRupeeSign, FaInfoCircle, FaDownload } from "react-icons/fa";
-import { MdPayment, MdFastfood } from "react-icons/md";
-import { IoTime, IoLocation } from "react-icons/io5";
-import { BsChevronDown, BsChevronUp } from "react-icons/bs";
+import { MdPayment } from "react-icons/md";
+import { IoTime } from "react-icons/io5";
 import { CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
+import api from "@/utils/axios";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface OrderItemDTO {
   itemId: number;
-  itemName: string;
+  itemName?: string;
   quantity: number;
   unitPrice: number;
   specialInstructions: string | null;
@@ -17,7 +18,7 @@ interface OrderItemDTO {
 
 interface OrderDTO {
   orderId: number;
-  userId: number;
+  customerId: number;
   vendorId: number;
   trainId: number;
   pnrNumber: string;
@@ -25,11 +26,11 @@ interface OrderDTO {
   seatNumber: string;
   deliveryStationId: number;
   deliveryTime: string;
-  orderStatus: "PENDING" | "PREPARING" | "DELIVERED" | "CANCELLED";
+  orderStatus: "PLACED" | "PENDING" | "PREPARING" | "DELIVERED" | "CANCELLED";
   totalAmount: number;
   deliveryCharges: number;
   taxAmount: number;
-  discountAmount: number;
+  discountAmount: number | null;
   finalAmount: number;
   paymentStatus: "PAID" | "PENDING" | "FAILED";
   paymentMethod: "COD" | "UPI" | "CARD" | "NETBANKING";
@@ -38,35 +39,29 @@ interface OrderDTO {
   items: OrderItemDTO[];
 }
 
-const mockOrders: OrderDTO[] = [
-  {
-    orderId: 1024,
-    userId: 37,
-    vendorId: 12,
-    trainId: 12345,
-    pnrNumber: "PNR123456",
-    coachNumber: "B1",
-    seatNumber: "24",
-    deliveryStationId: 201,
-    deliveryTime: "2023-06-15T12:30:00Z",
-    orderStatus: "DELIVERED",
-    totalAmount: 350,
-    deliveryCharges: 30,
-    taxAmount: 25,
-    discountAmount: 0,
-    finalAmount: 405,
-    paymentStatus: "PAID",
-    paymentMethod: "UPI",
-    razorpayOrderID: "rzp_123",
-    deliveryInstructions: "Please call before delivery",
-    items: [
-      { itemId: 1, itemName: "Veg Thali", quantity: 2, unitPrice: 150, specialInstructions: "Less spicy" },
-    ],
-  },
-  // Add more mock orders as needed
-];
+interface StationDTO {
+  stationId: number;
+  stationName: string;
+  stationCode: string;
+}
+
+interface ItemDTO {
+  itemId: number;
+  itemName: string;
+}
+
+interface PageResponse<T> {
+  content: T[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+  };
+  totalElements: number;
+  totalPages: number;
+}
 
 const statusConfig = {
+  PLACED: { color: "bg-amber-100 text-amber-800", icon: <Clock className="w-4 h-4" /> },
   PENDING: { color: "bg-amber-100 text-amber-800", icon: <Clock className="w-4 h-4" /> },
   PREPARING: { color: "bg-blue-100 text-blue-800", icon: <Loader2 className="w-4 h-4 animate-spin" /> },
   DELIVERED: { color: "bg-green-100 text-green-800", icon: <CheckCircle className="w-4 h-4" /> },
@@ -87,50 +82,198 @@ const paymentMethodConfig = {
 };
 
 const OrderHistory: React.FC = () => {
-  const [orders, setOrders] = useState<OrderDTO[]>([]);
+  const { userId, accessToken } = useAuth(); // Ensure token is stable
+  const [activeOrders, setActiveOrders] = useState<OrderDTO[]>([]);
+  const [historicalOrders, setHistoricalOrders] = useState<OrderDTO[]>([]);
+  const [stationNames, setStationNames] = useState<{ [key: number]: string }>({});
+  const [itemNames, setItemNames] = useState<{ [key: number]: string }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchOrdersAndStations = async () => {
       setLoading(true);
       setError(null);
+
       try {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setOrders(mockOrders);
-      } catch (err) {
-        setError("Failed to fetch orders");
+        // Fetch active orders
+        const activeResponse = await api.get<PageResponse<OrderDTO>>("/orders/user/active", {
+          params: { page: 0, size: 100 },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const activeOrdersData = activeResponse.data.content || [];
+
+        // Fetch historical orders
+        const historicalResponse = await api.get<PageResponse<OrderDTO>>("/orders/user/historical", {
+          params: { page: 0, size: 100 },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const historicalOrdersData = historicalResponse.data.content || [];
+
+        // Combine all orders
+        const allOrders = [...activeOrdersData, ...historicalOrdersData];
+        if (allOrders.length === 0) {
+          setActiveOrders([]);
+          setHistoricalOrders([]);
+          setLoading(false);
+          return;
+        }
+
+        // Transform orders
+        const transformedOrders = allOrders.map((order) => ({
+          ...order,
+          userId: order.customerId,
+          discountAmount: order.discountAmount ?? 0,
+          items: order.items.map((item) => ({
+            ...item,
+            specialInstructions: item.specialInstructions || null,
+          })),
+        }));
+
+        // Fetch item names for uncached items
+        const itemIds = [...new Set(allOrders.flatMap((order) => order.items.map((item) => item.itemId)))];
+        const uncachedItemIds = itemIds.filter((itemId) => !itemNames[itemId]);
+        let newItemNames = { ...itemNames };
+
+        if (uncachedItemIds.length > 0) {
+          const itemPromises = uncachedItemIds.map(async (itemId) => {
+            try {
+              const response = await api.get<ItemDTO>(`/items/${itemId}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+              return { itemId, itemName: response.data.itemName };
+            } catch (err) {
+              console.error(`Failed to fetch item ${itemId}:`, err);
+              return { itemId, itemName: `Item ${itemId}` };
+            }
+          });
+
+          const itemResults = await Promise.all(itemPromises);
+          newItemNames = {
+            ...itemNames,
+            ...itemResults.reduce((acc, { itemId, itemName }) => {
+              acc[itemId] = itemName;
+              return acc;
+            }, {} as { [key: number]: string }),
+          };
+          setItemNames(newItemNames);
+        }
+
+        // Update orders with item names
+        const ordersWithItemNames = transformedOrders.map((order) => ({
+          ...order,
+          items: order.items.map((item) => ({
+            ...item,
+            itemName: newItemNames[item.itemId] || `Item ${item.itemId}`,
+          })),
+        }));
+
+        // Fetch station names for uncached stations
+        const stationIds = [...new Set(allOrders.map((order) => order.deliveryStationId))];
+        const uncachedStationIds = stationIds.filter((stationId) => !stationNames[stationId]);
+        let newStationNames = { ...stationNames };
+
+        if (uncachedStationIds.length > 0) {
+          const stationPromises = uncachedStationIds.map(async (stationId) => {
+            try {
+              const response = await api.get<StationDTO>(`/stations/${stationId}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+              return { stationId, stationName: `${response.data.stationName} (${response.data.stationCode})` };
+            } catch (err) {
+              console.error(`Failed to fetch station ${stationId}:`, err);
+              return { stationId, stationName: `Station ${stationId}` };
+            }
+          });
+
+          const stationResults = await Promise.all(stationPromises);
+          newStationNames = {
+            ...stationNames,
+            ...stationResults.reduce((acc, { stationId, stationName }) => {
+              acc[stationId] = stationName;
+              return acc;
+            }, {} as { [key: number]: string }),
+          };
+          setStationNames(newStationNames);
+        }
+
+        setActiveOrders(ordersWithItemNames.filter((o) => ["PLACED", "PENDING", "PREPARING"].includes(o.orderStatus)));
+        setHistoricalOrders(ordersWithItemNames.filter((o) => ["DELIVERED", "CANCELLED"].includes(o.orderStatus)));
+      } catch (err: any) {
+        setError(err.response?.data?.message || "Failed to fetch orders. Please try again.");
       } finally {
         setLoading(false);
       }
     };
-    fetchOrders();
-  }, []);
+
+    if (userId && accessToken) {
+      fetchOrdersAndStations();
+    }
+  }, [userId, accessToken]); // Only depend on userId and token
 
   const generateInvoice = (order: OrderDTO) => {
     const doc = new jsPDF();
-    doc.text(`Invoice #${order.orderId}`, 10, 10);
+    doc.setFontSize(18);
+    doc.text(`Invoice #${order.orderId}`, 20, 20);
+
+    const headers = [["Item Name", "Quantity", "Unit Price", "Total", "Instructions"]];
+    const data = order.items.map((item) => [
+      item.itemName || `Item ${item.itemId}`,
+      item.quantity,
+      `₹${item.unitPrice.toFixed(2)}`,
+      `₹${(item.quantity * item.unitPrice).toFixed(2)}`,
+      item.specialInstructions || "None",
+    ]);
+
+    (doc as any).autoTable({
+      head: headers,
+      body: data,
+      startY: 30,
+      theme: "grid",
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [0, 102, 204] },
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.text(`Order Date: ${formatDate(order.deliveryTime)}`, 20, finalY);
+    doc.text(`Train: ${order.trainId}, Coach: ${order.coachNumber}, Seat: ${order.seatNumber}`, 20, finalY + 10);
+    doc.text(`Delivery Station: ${stationNames[order.deliveryStationId] || order.deliveryStationId}`, 20, finalY + 20);
+    doc.text(`Total Amount: ₹${order.totalAmount.toFixed(2)}`, 20, finalY + 30);
+    doc.text(`Delivery Charges: ₹${order.deliveryCharges.toFixed(2)}`, 20, finalY + 40);
+    doc.text(`Tax: ₹${order.taxAmount.toFixed(2)}`, 20, finalY + 50);
+    if (order.discountAmount && order.discountAmount > 0) {
+      doc.text(`Discount: ₹${order.discountAmount.toFixed(2)}`, 20, finalY + 60);
+      doc.text(`Final Amount: ₹${order.finalAmount.toFixed(2)}`, 20, finalY + 70);
+    } else {
+      doc.text(`Final Amount: ₹${order.finalAmount.toFixed(2)}`, 20, finalY + 60);
+    }
+    doc.text(`Payment Status: ${order.paymentStatus}`, 20, finalY + 80);
+    doc.text(`Payment Method: ${order.paymentMethod}`, 20, finalY + 90);
+    if (order.deliveryInstructions) {
+      doc.text(`Delivery Instructions: ${order.deliveryInstructions}`, 20, finalY + 100);
+    }
+
     doc.save(`invoice-${order.orderId}.pdf`);
   };
 
-  const activeOrders = orders.filter(order => 
-    ["PENDING", "PREPARING"].includes(order.orderStatus)
+  const currentOrders = useMemo(
+    () => (activeTab === "active" ? activeOrders : historicalOrders),
+    [activeTab, activeOrders, historicalOrders]
   );
-
-  const completedOrders = orders.filter(order => 
-    ["DELIVERED", "CANCELLED"].includes(order.orderStatus)
-  );
-
-  const currentOrders = activeTab === "active" ? activeOrders : completedOrders;
 
   const toggleOrderDetails = (orderId: number) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    return new Date(dateString).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
   };
 
   return (
@@ -152,7 +295,7 @@ const OrderHistory: React.FC = () => {
               activeTab === "completed" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500"
             }`}
           >
-            Completed ({completedOrders.length})
+            Completed ({historicalOrders.length})
           </button>
         </div>
       </div>
@@ -199,7 +342,7 @@ const OrderHistory: React.FC = () => {
                     <tr className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">#{order.orderId}</div>
-                        <div className="text-sm text-gray-500">{formatDate(order.deliveryTime)}</div>
+                        <p className="text-sm text-gray-500">{formatDate(order.deliveryTime)}</p>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -260,7 +403,7 @@ const OrderHistory: React.FC = () => {
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                   <span className="text-gray-500">Station:</span>
-                                  <span>{order.deliveryStationId}</span>
+                                  <span>{stationNames[order.deliveryStationId] || order.deliveryStationId}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="text-gray-500">Instructions:</span>
@@ -275,7 +418,7 @@ const OrderHistory: React.FC = () => {
                                   <li key={item.itemId} className="py-2">
                                     <div className="flex justify-between">
                                       <div>
-                                        <p className="font-medium">{item.itemName}</p>
+                                        <p className="font-medium">{item.itemName || `Item ${item.itemId}`}</p>
                                         {item.specialInstructions && (
                                           <p className="text-xs text-gray-500">Note: {item.specialInstructions}</p>
                                         )}
@@ -380,7 +523,7 @@ const OrderHistory: React.FC = () => {
                         <div className="mt-2 space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-500">Station:</span>
-                            <span>{order.deliveryStationId}</span>
+                            <span>{stationNames[order.deliveryStationId] || order.deliveryStationId}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-500">Instructions:</span>
@@ -395,7 +538,7 @@ const OrderHistory: React.FC = () => {
                             <li key={item.itemId}>
                               <div className="flex justify-between">
                                 <div>
-                                  <p className="font-medium">{item.itemName}</p>
+                                  <p className="font-medium">{item.itemName || `Item ${item.itemId}`}</p>
                                   {item.specialInstructions && (
                                     <p className="text-xs text-gray-500">Note: {item.specialInstructions}</p>
                                   )}
