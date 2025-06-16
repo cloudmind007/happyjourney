@@ -13,7 +13,7 @@ import { MdPayment, MdFastfood } from "react-icons/md";
 import { IoTime, IoChevronDown, IoChevronUp } from "react-icons/io5";
 import { CheckCircle, XCircle, Clock, Loader2, CreditCard, Wallet, Truck, ChefHat } from "lucide-react";
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable"; // Correct import for jspdf-autotable
 import api from "@/utils/axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -337,13 +337,20 @@ const OrderHistory: React.FC = () => {
     };
 
     fetchOrdersAndData();
-  }, [userId, accessToken]); // Removed isRefreshing from dependencies
+  }, [userId, accessToken]);
 
   const generateInvoice = (order: OrderDTO) => {
     const doc = new jsPDF({
       orientation: "portrait",
       unit: "mm",
       format: "a4",
+    });
+
+    // Register autoTable with jsPDF
+    autoTable(doc, {
+      startY: 102,
+      head: [],
+      body: [],
     });
 
     doc.setFontSize(22);
@@ -399,7 +406,7 @@ const OrderHistory: React.FC = () => {
       item.specialInstructions || "-",
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 102,
       head: headers,
       body: data,
@@ -497,6 +504,10 @@ const OrderHistory: React.FC = () => {
       default:
         return 0;
     }
+  };
+
+  const canDownloadInvoice = (order: OrderDTO) => {
+    return order.orderStatus === "DELIVERED" || order.paymentStatus === "PAID";
   };
 
   if (loading) {
@@ -819,10 +830,12 @@ const OrderHistory: React.FC = () => {
                           <Button variant="outline" onClick={() => toggleOrderDetails(order.orderId)}>
                             Close Details
                           </Button>
-                          <Button onClick={() => generateInvoice(order)} className="gap-2">
-                            <FaDownload className="w-4 h-4" />
-                            Download Invoice
-                          </Button>
+                          {canDownloadInvoice(order) && (
+                            <Button onClick={() => generateInvoice(order)} className="gap-2">
+                              <FaDownload className="w-4 h-4" />
+                              Download Invoice
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -837,4 +850,4 @@ const OrderHistory: React.FC = () => {
   );
 };
 
-export default OrderHistory;
+export default OrderHistory
