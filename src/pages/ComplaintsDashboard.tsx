@@ -376,7 +376,7 @@ const ComplaintsDashboard: FC = () => {
                 <MenuItem value="RESOLVED">Resolved</MenuItem>
               </Select>
               <Box display="flex" justifyContent="flex-end" gap={2}>
-                <Button variant="contained" onClick={handleUpdateStatus}>
+                <Button onClick={handleUpdateStatus}>
                   Update
                 </Button>
                 <Button className="bg-gray-600" onClick={handleClose}>

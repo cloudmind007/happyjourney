@@ -1,30 +1,17 @@
 import { useState } from "react";
 import {
   Search,
-  ChevronDown,
+
   MoreHorizontal,
-  Grid3X3,
-  Users,
   FileText,
-  Package,
-  Utensils,
-  ShoppingCart,
-  CreditCard,
-  MapPin,
-  Award,
-  Star,
-  Palette,
-  Globe,
-  RefreshCw,
-  Menu,
-  X,
+
 } from "lucide-react";
 
 export default function MediaFilesUI() {
   const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [searchBy, setSearchBy] = useState("Search By User ID");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
 
   const mediaFiles = [
     {
@@ -93,23 +80,7 @@ export default function MediaFilesUI() {
     },
   ];
 
-  const sidebarItems = [
-    { icon: Grid3X3, label: "Dashboard", active: false },
-    { icon: FileText, label: "Media", active: true },
-    { icon: FileText, label: "Pages", active: false },
-    { icon: Package, label: "Products", active: false },
-    { icon: Utensils, label: "Restaurant", active: false },
-    { icon: Users, label: "Customers", active: false },
-    { icon: ShoppingCart, label: "Orders", active: false },
-    { icon: CreditCard, label: "Plans", active: false },
-    { icon: MapPin, label: "Station", active: false },
-    { icon: Award, label: "Badges", active: false },
-    { icon: Star, label: "Featured", active: false },
-    { icon: FileText, label: "Earning Reports", active: false },
-    { icon: Palette, label: "Appearance", active: false },
-    { icon: Globe, label: "Language", active: false },
-    { icon: RefreshCw, label: "Update", active: false },
-  ];
+  
 
   const handleSelectAll = (checked: any) => {
     if (checked) {

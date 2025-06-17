@@ -1,4 +1,4 @@
-import React from "react";
+
 import { FileText, ClipboardList, AlertTriangle, BookOpen } from "lucide-react";
 
 const TermsAndConditions = () => {

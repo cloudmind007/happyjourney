@@ -1,8 +1,7 @@
-import { Restaurant } from "@mui/icons-material";
 import {
   LayoutDashboard,
   UtensilsCrossed,
-  Users,
+
   ShoppingCart,
   Home,
   Wallet,
@@ -29,7 +28,7 @@ export type MenuItem = {
 
 export const adminMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: Restaurant, label: "Restaurant", path: "/restaurant" }, // UtensilsCrossed → Restaurant (more recognizable)
+  { icon: UtensilsCrossed, label: "Restaurant", path: "/restaurant" },
   { icon: Train, label: "Stations", path: "/stations" }, // MapPin → Train (if stations are transport-related)
   { icon: PhoneIncoming, label: "Callback Requests", path: "/contactrequests" }, // PhoneCallback → PhoneIncoming
   { icon: AlertTriangle, label: "Complaints", path: "/complaints" }, // AlertCircle → AlertTriangle (more urgent)

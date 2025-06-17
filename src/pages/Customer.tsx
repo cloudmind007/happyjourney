@@ -5,8 +5,8 @@ import { Plus, Search } from "lucide-react";
 import api from "../utils/axios";
 
 const Customer: FC = () => {
-  const [listData, setListData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [listData] = useState([]);
+  const [loading] = useState(false);
   const [page, setPage] = useState({
     current_page: 1,
     to: 0,

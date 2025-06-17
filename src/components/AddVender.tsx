@@ -110,9 +110,10 @@ export default function AddVendor({
   setRefresh,
   refresh,
 }: IndiProps) {
+  
+  const [, setUploadedFileUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrlPreview, setLogoUrlPreview] = useState<string | null>(null);
-  // const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [stationsList, setStationsList] = useState<Station[]>([]);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -123,7 +124,7 @@ export default function AddVendor({
     setValue,
     formState: { errors, isDirty },
   } = useForm<FormData>({
-    resolver: yupResolver(validationSchema),
+    resolver: yupResolver(validationSchema) as any,
     context: { mode },
     defaultValues: {
       email: "",
@@ -406,7 +407,7 @@ export default function AddVendor({
 
         <Box
           component="form"
-          onSubmit={handleSubmit(onSubmit)}
+          onSubmit={handleSubmit(onSubmit as any)}
           sx={{
             flex: 1,
             overflowY: "auto",

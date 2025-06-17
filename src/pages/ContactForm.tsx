@@ -42,7 +42,7 @@ const ContactForm: React.FC = () => {
     formState: { errors, isSubmitting },
     reset,
   } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     mode: 'onChange', // Real-time validation
   });
 

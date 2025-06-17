@@ -87,7 +87,8 @@ const formSchema = z.object({
 // Mock logger
 const logger = {
   info: (msg: string, meta?: any) => console.log(`[INFO] ${msg}`, meta),
-  error: (msg: string, meta?: any) => console.error(`[ERROR] ${msg}`, meta),
+    error: (msg: string, meta?: any) => console.error(`[ERROR] ${msg}`, meta),
+  warn: (msg: string, meta?: any) => console.warn(`[WARN] ${msg}`, meta),
 };
 
 // Reusable Form Field Component
@@ -149,7 +150,7 @@ const OrderItem: React.FC<{ item: CartItem }> = ({ item }) => (
 );
 
 const PlaceOrder: React.FC = () => {
-  const { userId, role, token } = useAuth();
+  const { userId, role } = useAuth();
   const navigate = useNavigate();
   const { vendorId } = useParams<{ vendorId: string }>();
   const effectiveVendorId = Number(vendorId);
@@ -157,7 +158,7 @@ const PlaceOrder: React.FC = () => {
   const [cartSummary, setCartSummary] = useState<CartSummary | null>(null);
   const [station, setStation] = useState<Station | null>(null);
   const [vendorDetails, setVendorDetails] = useState<VendorDetails | null>(null);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  
   const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState<string>("");
   const [formData, setFormData] = useState({
     pnrNumber: "",
@@ -202,7 +203,6 @@ const PlaceOrder: React.FC = () => {
 
     setIsLoading(true);
     try {
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       logger.info("Fetching initial data", { vendorId: effectiveVendorId, userId });
 
       // Fetch cart summary
@@ -226,7 +226,6 @@ const PlaceOrder: React.FC = () => {
       // Fetch menu items
       const menuItemsResponse = await api.get(`/menu/vendors/${effectiveVendorId}/items`);
       const fetchedMenuItems = menuItemsResponse.data || [];
-      setMenuItems(fetchedMenuItems);
 
       // Enrich cart items with itemName
       const enrichedItems = cartData.items.map((item: CartItem) => ({
@@ -275,7 +274,7 @@ const PlaceOrder: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, role, token, effectiveVendorId, navigate, retryCount]);
+  }, [userId, role, effectiveVendorId, navigate, retryCount]);
 
   useEffect(() => {
     fetchInitialData();
@@ -391,7 +390,7 @@ const PlaceOrder: React.FC = () => {
         const order = response.data;
         logger.info("Online order created", { orderId: order.orderId });
 
-        const razorpayKey = process.env.REACT_APP_RAZORPAY_KEY_ID;
+        const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
         if (!razorpayKey) {
           throw new Error("Razorpay key not configured");
         }

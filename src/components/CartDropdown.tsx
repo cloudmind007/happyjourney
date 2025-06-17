@@ -1,6 +1,7 @@
 // contexts/CartContext.tsx
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 import api from '@/utils/axios';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CartItem {
   itemId: number;

@@ -53,7 +53,7 @@ const AddCategoryModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
     reset,
     formState: { errors },
   } = useForm<FormData>({
-    resolver: yupResolver(validationSchema),
+    resolver: yupResolver(validationSchema) as any,
     defaultValues: {
       categoryName: "",
       displayOrder: 0,
@@ -128,7 +128,7 @@ const AddCategoryModal = ({ open, setOpen, id, setId, mode, setRefresh, refresh,
         </IconButton>
         {isLoading && <LoaderModal />}
         {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit as any)}>
           <div className="grid md:grid-cols-1 gap-4 mb-2">
             <div className="mb-4 w-full">
               <label className="block text-sm font-medium text-gray-700" htmlFor="categoryName">

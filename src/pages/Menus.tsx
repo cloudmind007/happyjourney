@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../utils/axios";
 import { Plus, Search } from "lucide-react";
 import LoaderModal from "../components/LoaderModal";
 import Pagination from "../components/Pagination";
 
 const Menus = () => {
-  const [listData, setListData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [listData] = useState([]);
+  const [loading] = useState(false);
  
   const [page, setPage] = useState({
     current_page: 1,

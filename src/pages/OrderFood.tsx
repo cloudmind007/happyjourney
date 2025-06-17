@@ -92,7 +92,7 @@ const OrderFood = () => {
     func: F,
     wait: number
   ) => {
-    let timeout: NodeJS.Timeout;
+    let timeout: ReturnType<typeof setTimeout>;
     return (...args: Parameters<F>) => {
       clearTimeout(timeout);
       timeout = setTimeout(() => func(...args), wait);
@@ -234,28 +234,7 @@ const OrderFood = () => {
     };
   }, [imageUrls]);
 
-  const renderStarRating = (rating: number) => {
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
 
-    return (
-      <div className="flex items-center">
-        {[...Array(fullStars)].map((_, i) => (
-          <Star key={`full-${i}`} className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-        ))}
-        {hasHalfStar && (
-          <div className="relative w-3 h-3">
-            <Star className="absolute w-3 h-3 fill-gray-300 text-gray-300" />
-            <Star className="absolute w-3 h-3 fill-yellow-500 text-yellow-500" style={{ clipPath: 'inset(0 50% 0 0)' }} />
-          </div>
-        )}
-        {[...Array(emptyStars)].map((_, i) => (
-          <Star key={`empty-${i}`} className="w-3 h-3 fill-gray-300 text-gray-300" />
-        ))}
-      </div>
-    );
-  };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -411,7 +390,7 @@ const OrderFood = () => {
                       <div className="col-span-2">
                         <span className="font-medium">Cuisines:</span>{" "}
                         {vendor.categories?.slice(0, 3).map((c) => c.categoryName).join(", ")}
-                        {vendor.categories.length > 3 && "..."}
+                        {vendor.categories && vendor.categories.length > 3 && "..."}
                       </div>
                     </div>
                     <Button

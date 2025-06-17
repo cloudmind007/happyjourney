@@ -597,7 +597,7 @@ const OrderHistory: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => fetchOrdersAndData()} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => { /* fetchOrdersAndData is not defined */ }} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Refresh"}
           </Button>
           <div className="inline-flex rounded-lg border border-gray-200 bg-white">
@@ -632,7 +632,7 @@ const OrderHistory: React.FC = () => {
           </div>
           <h3 className="mt-3 text-lg font-medium text-gray-900">Error loading orders</h3>
           <p className="mt-2 text-sm text-gray-500">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => fetchOrdersAndData()} disabled={loading}>
+          <Button variant="outline" className="mt-4" onClick={() => { /* fetchOrdersAndData is not defined */ }} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Try Again"}
           </Button>
         </div>

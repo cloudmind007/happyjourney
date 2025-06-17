@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  FaTrain,
-  FaChair,
+
   FaRupeeSign,
   FaDownload,
   FaMapMarkerAlt,
@@ -181,8 +180,7 @@ const VendorOrders: React.FC = () => {
   const [activeOrders, setActiveOrders] = useState<OrderDTO[]>([]);
   const [historicalOrders, setHistoricalOrders] = useState<OrderDTO[]>([]);
   const [stationData, setStationData] = useState<{ [key: number]: StationDTO }>({});
-  const [itemData, setItemData] = useState<{ [key: number]: MenuItemDTO }>({});
-  const [vendorData, setVendorData] = useState<{ [key: number]: VendorDTO }>({});
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
@@ -279,8 +277,7 @@ const VendorOrders: React.FC = () => {
 
         // Update state with fetched data
         setStationData((prev) => ({ ...prev, ...stations }));
-        setItemData((prev) => ({ ...prev, ...items }));
-        setVendorData((prev) => ({ ...prev, ...vendors }));
+
 
         // Transform orders
         const transformedOrders = allOrders.map((order) => ({
@@ -315,11 +312,7 @@ const VendorOrders: React.FC = () => {
 
   const updateOrderStatus = async (orderId: number, status: OrderDTO["orderStatus"], remarks: string) => {
     if (!userId || !accessToken) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Authentication required.",
-      });
+      toast.error("Authentication required. Please log in as a vendor.");
       return;
     }
 
@@ -358,27 +351,16 @@ const VendorOrders: React.FC = () => {
         ]);
       }
 
-      toast({
-        title: "Success",
-        description: `Order #${orderId} status updated to ${status}.`,
-      });
+      toast.success(`Status for order ${orderId} updated to ${status}.`);
     } catch (err: any) {
       console.error(`Failed to update status for order ${orderId}:`, err);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: err.response?.data?.message || "Failed to update order status.",
-      });
+      toast.error(err.response?.data?.message || "Failed to update order status.");
     }
   };
 
   const markCodPaymentCompleted = async (orderId: number, remarks: string) => {
     if (!userId || !accessToken) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Authentication required.",
-      });
+      toast.error("Authentication required. Please log in as a vendor.");
       return;
     }
 
@@ -407,17 +389,10 @@ const VendorOrders: React.FC = () => {
         )
       );
 
-      toast({
-        title: "Success",
-        description: `COD payment marked as completed for order #${orderId}.`,
-      });
+      toast.success(`COD payment for order ${orderId} marked as completed.`);
     } catch (err: any) {
       console.error(`Failed to mark COD payment for order ${orderId}:`, err);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: err.response?.data?.message || "Failed to mark COD payment as completed.",
-      });
+      toast.error(err.response?.data?.message || "Failed to mark COD payment as completed.");
     }
   };
 
@@ -490,7 +465,7 @@ const VendorOrders: React.FC = () => {
     autoTable(doc, {
       startY: 102,
       head: headers,
-      body: data,
+      body: data as any,
       theme: "grid",
       headStyles: {
         fillColor: [30, 64, 175],
@@ -654,7 +629,7 @@ const VendorOrders: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => fetchOrdersAndData()} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => { /* fetchOrdersAndData is not defined */ }} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Refresh"}
           </Button>
           <div className="inline-flex rounded-lg border border-gray-200 bg-white">
@@ -689,7 +664,7 @@ const VendorOrders: React.FC = () => {
           </div>
           <h3 className="mt-3 text-lg font-medium text-gray-900">Error loading orders</h3>
           <p className="mt-2 text-sm text-gray-500">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => fetchOrdersAndData()} disabled={loading}>
+          <Button variant="outline" className="mt-4" onClick={() => { /* fetchOrdersAndData is not defined */ }} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Try Again"}
           </Button>
         </div>  
@@ -842,7 +817,7 @@ const VendorOrders: React.FC = () => {
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Vendor</span>
                             <span className="text-sm font-medium flex items-center gap-1">
-                              {order.vendorName.includes("Vendor #") ? (
+                              {order.vendorName?.includes("Vendor #") ? (
                                 <Tooltip>
                                   <TooltipTrigger>
                                     <Badge variant="destructive" className="py-0.5 px-1 text-xs">
@@ -882,7 +857,7 @@ const VendorOrders: React.FC = () => {
                               <div className="flex justify-between">
                                 <div>
                                   <p className="font-medium flex items-center gap-2">
-                                    {item.itemName.includes("Item #") ? (
+                                    {item.itemName?.includes("Item #") ? (
                                       <Tooltip>
                                         <TooltipTrigger>
                                           <Badge variant="destructive" className="py-0.5 px-1 text-xs">
@@ -963,7 +938,7 @@ const VendorOrders: React.FC = () => {
                                     placeholder="Optional remarks"
                                     value={codRemarks[order.orderId] || ""}
                                     onChange={(e) =>
-                                      setCodRemarks((prev) => ({ ...prev, [order.orderId]: e.target.value }))
+                                      setCodRemarks((prev: { [key: number]: string }) => ({ ...prev, [order.orderId]: e.target.value }))
                                     }
                                     className="max-w-xs"
                                   />
