@@ -692,7 +692,7 @@ const VendorOrders: React.FC = () => {
           <Button variant="outline" className="mt-4" onClick={() => fetchOrdersAndData()} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Try Again"}
           </Button>
-        </div>
+        </div>  
       ) : currentOrders.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-6 text-center border border-gray-100">
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-50">

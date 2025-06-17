@@ -7,8 +7,7 @@ import Media from "./pages/Media";
 import AdminRegister from "./pages/AdminRegister";
 import UserRegister from "./pages/UserRegister";
 import Restaurant from "./pages/Restaurant";
-import Customer from "./pages/Customer";
-import Station from "./pages/Station";
+  import Station from "./pages/Station";
 import RestaurantDetail from "./pages/RestaurantDetail";
 import VendorHome from "./pages/VendorHome";
 import OrderFood from "./pages/OrderFood";
@@ -28,6 +27,9 @@ import FeedbackForm from "./pages/FeedbackForm";
 import UserOrder from "./pages/UserOrder";
 import PlaceOrder from "./pages/PlaceOrder";
 import OrderConfirmation from "./pages/OrderConfirmation";
+import BulkOrdersDashboard from "./pages/BulkOrderDashboard";
+import ComplaintsDashboard from "./pages/ComplaintsDashboard";
+import CallbacksDashboard from "./pages/CallbacksDashboard";
 
 const App = () => {
   return (
@@ -48,8 +50,10 @@ const App = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/media" element={<Media />} />
             <Route path="/restaurant" element={<Restaurant />} />
-            <Route path="/customers" element={<Customer />} />
+            <Route path="/bulkorder" element={<BulkOrdersDashboard />} />
             <Route path="/stations" element={<Station />} />
+            <Route path="/complaints" element={<ComplaintsDashboard />} />
+            <Route path="/contactrequests" element={<CallbacksDashboard />} />
             <Route path="/vendor-detail/:id" element={<RestaurantDetail/>} />
             {/* <Route path="/callbackrequests/" element={<CallbackRequest/>} /> */}
             <Route path="/vendor-detail/:id" element={<RestaurantDetail/>} />
@@ -68,7 +72,7 @@ const App = () => {
           <Route path="/home" element={<OrderFood />} />
           <Route path="/cart" element={<OrderFood />} />
           <Route path="/bulk-order" element={<BulkOrderForm />} />
-          <Route path="/complaints" element={<ComplaintForm />} />
+          <Route path="/createcomplaint" element={<ComplaintForm />} />
           <Route path="/feedback" element={<FeedbackForm />} />
           <Route path="/contact" element={<ContactForm />} />
           <Route path="/wallet" element={<WalletPage />} />

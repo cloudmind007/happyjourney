@@ -1,104 +1,106 @@
-import React, { useState } from "react";
-import api from "@/utils/axios";
-import { useNavigate } from "react-router-dom";
-import { CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
+import React from 'react';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import sanitizeHtml from 'sanitize-html';
+import api from '@/utils/axios';
+
+// Define the form schema with Zod
+const formSchema = z.object({
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(50, 'Name cannot exceed 50 characters')
+    .regex(/^[a-zA-Z\s]*$/, 'Name can only contain letters and spaces')
+    .transform((val) => sanitizeHtml(val)),
+  email: z
+    .string()
+    .email('Please enter a valid email address')
+    .max(100, 'Email cannot exceed 100 characters')
+    .transform((val) => sanitizeHtml(val)),
+  mobileNumber: z
+    .string()
+    .regex(/^[0-9]{10}$/, 'Please enter a valid 10-digit mobile number')
+    .transform((val) => sanitizeHtml(val)),
+  message: z
+    .string()
+    .min(10, 'Message must be at least 10 characters')
+    .max(500, 'Message cannot exceed 500 characters')
+    .transform((val) => sanitizeHtml(val)),
+});
+
+// Infer the form data type from the schema
+type FormData = z.infer<typeof formSchema>;
 
 const ContactForm: React.FC = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    mobileNumber: "",
-    message: "",
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    mode: 'onChange', // Real-time validation
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ show: boolean; callbackId?: string }>({ show: false });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  const [success, setSuccess] = React.useState<{ show: boolean; callbackId?: string }>({ show: false });
+  const [apiError, setApiError] = React.useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess({ show: false });
-
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
+    setApiError(null);
     try {
-      const payload = {
-        name: formData.name,
-        email: formData.email,
-        mobileNumber: formData.mobileNumber,
-        message: formData.message,
-      };
-
-      const response = await api.post("/callbacks", payload);
+      const response = await api.post('/callbacks', data);
       if (response.status === 200 || response.status === 201) {
         setSuccess({ show: true, callbackId: response.data.callbackId });
-        setFormData({
-          name: "",
-          email: "",
-          mobileNumber: "",
-          message: "",
-        });
-        setTimeout(() => navigate("/"), 3000);
+        reset();
+        setTimeout(() => navigate('/'), 3000);
       }
     } catch (err: any) {
-      let errorMessage = "Failed to submit callback request. Please try again.";
-
+      let errorMessage = 'Failed to submit callback request. Please try again.';
       if (err.response) {
         const data = err.response.data;
-        if (typeof data === "string") {
-          errorMessage = data;
-        } else if (data?.message) {
-          errorMessage = data.message;
-        } else if (data?.error) {
-          errorMessage = data.error;
-        } else if (err.response.statusText) {
-          errorMessage = err.response.statusText;
-        }
+        errorMessage =
+          typeof data === 'string'
+            ? data
+            : data?.message || data?.error || err.response.statusText || errorMessage;
       } else if (err.message) {
         errorMessage = err.message;
       }
-
-      setError(errorMessage);
-      console.error("Error submitting callback:", err);
-    } finally {
-      setLoading(false);
+      setApiError(errorMessage);
     }
   };
 
   if (success.show) {
     return (
-      <div className="fixed inset-0 bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-            <CheckCircleIcon className="h-8 w-8 text-green-600" />
+      <div className="fixed inset-0 bg-gray-100 flex items-center justify-center p-4 animate-fade-in">
+        <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full text-center transform transition-all duration-300 scale-100">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 animate-pulse">
+            <CheckCircleIcon className="h-8 w-8 text-green-600" aria-hidden="true" />
           </div>
           <h2 className="mt-3 text-2xl font-bold text-gray-900">
-            Callback Request Submitted Successfully!
+            Callback Request Submitted!
           </h2>
-          <div className="mt-4">
+          <div className="mt-4 space-y-2">
             <p className="text-gray-600">
-              We've received your callback request
-              {success.callbackId && ` (ID: ${success.callbackId})`}. Our team will contact you shortly.
+              We've received your request
+              {success.callbackId && (
+                <span className="font-semibold"> (ID: {success.callbackId})</span>
+              )}.
+              Our team will contact you shortly.
             </p>
-            <p className="mt-2 text-gray-500 text-sm">
+            <p className="text-gray-500 text-sm">
               You'll receive a confirmation email with your request details.
             </p>
-            <p className="mt-2 text-gray-500 text-sm">
-              Redirecting to home page...
-            </p>
+            <p className="text-gray-500 text-sm animate-pulse">Redirecting to home...</p>
           </div>
           <div className="mt-6">
             <div className="w-full bg-gray-200 rounded-full h-2.5">
               <div
                 className="bg-green-600 h-2.5 rounded-full animate-[progress_3s_linear_forwards]"
-                style={{ animationFillMode: "forwards" }}
+                style={{ animationFillMode: 'forwards' }}
               ></div>
             </div>
           </div>
@@ -108,96 +110,133 @@ const ContactForm: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100 justify-center items-center p-4 sm:p-6">
-      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 w-full max-w-md">
-        <h2 className="text-2xl sm:text-3xl font-bold text-blue-600 mb-6">
+    <div className="min-h-screen bg-gray-100 flex justify-center items-center p-4 sm:p-6">
+      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 w-full max-w-md animate-slide-up">
+        <h2 className="text-2xl sm:text-3xl font-bold text-black-600 mb-6">
           Request a Callback
         </h2>
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700"
+            >
               Your Name *
             </label>
             <input
               type="text"
               id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              className="mt-1 w-full p-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              {...register('name')}
+              className={`mt-1 w-full p-3 border rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 ${
+                errors.name ? 'border-red-500' : 'border-gray-300'
+              }`}
               placeholder="John Doe"
+              aria-invalid={errors.name ? 'true' : 'false'}
+              aria-describedby={errors.name ? 'name-error' : undefined}
             />
+            {errors.name && (
+              <p id="name-error" className="mt-1 text-sm text-red-600">
+                {errors.name.message}
+              </p>
+            )}
           </div>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700"
+            >
               Email Address *
             </label>
             <input
               type="email"
               id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              className="mt-1 w-full p-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              {...register('email')}
+              className={`mt-1 w-full p-3 border rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 ${
+                errors.email ? 'border-red-500' : 'border-gray-300'
+              }`}
               placeholder="your@email.com"
+              aria-invalid={errors.email ? 'true' : 'false'}
+              aria-describedby={errors.email ? 'email-error' : undefined}
             />
+            {errors.email && (
+              <p id="email-error" className="mt-1 text-sm text-red-600">
+                {errors.email.message}
+              </p>
+            )}
           </div>
           <div>
-            <label htmlFor="mobileNumber" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="mobileNumber"
+              className="block text-sm font-medium text-gray-700"
+            >
               Mobile Number *
             </label>
             <input
               type="tel"
               id="mobileNumber"
-              name="mobileNumber"
-              value={formData.mobileNumber}
-              onChange={handleChange}
-              required
-              className="mt-1 w-full p-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              {...register('mobileNumber')}
+              className={`mt-1 w-full p-3 border rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 ${
+                errors.mobileNumber ? 'border-red-500' : 'border-gray-300'
+              }`}
               placeholder="9876543210"
-              pattern="[0-9]{10}"
-              title="Please enter a 10-digit mobile number"
+              aria-invalid={errors.mobileNumber ? 'true' : 'false'}
+              aria-describedby={errors.mobileNumber ? 'mobileNumber-error' : undefined}
             />
+            {errors.mobileNumber && (
+              <p id="mobileNumber-error" className="mt-1 text-sm text-red-600">
+                {errors.mobileNumber.message}
+              </p>
+            )}
           </div>
           <div>
-            <label htmlFor="message" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="message"
+              className="block text-sm font-medium text-gray-700"
+            >
               Message *
             </label>
             <textarea
               id="message"
-              name="message"
-              value={formData.message}
-              onChange={handleChange}
-              required
-              className="mt-1 w-full p-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              {...register('message')}
+              className={`mt-1 w-full p-3 border rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 ${
+                errors.message ? 'border-red-500' : 'border-gray-300'
+              }`}
               placeholder="Please provide details for your callback request..."
               rows={5}
+              aria-invalid={errors.message ? 'true' : 'false'}
+              aria-describedby={errors.message ? 'message-error' : undefined}
             />
+            {errors.message && (
+              <p id="message-error" className="mt-1 text-sm text-red-600">
+                {errors.message.message}
+              </p>
+            )}
           </div>
-          {error && (
+          {apiError && (
             <div className="p-4 bg-red-50 rounded-lg flex items-start">
-              <ExclamationCircleIcon className="h-5 w-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
-              <div>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
-              </div>
+              <ExclamationCircleIcon
+                className="h-5 w-5 text-red-500 mt-0.5 mr-2 flex-shrink-0"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-red-700">{apiError}</p>
             </div>
           )}
           <button
             type="submit"
-            disabled={loading}
+            disabled={isSubmitting}
             className={`w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ${
-              loading ? "opacity-50 cursor-not-allowed" : ""
+              isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
             }`}
+            aria-label="Submit callback request"
           >
-            {loading ? (
+            {isSubmitting ? (
               <div className="flex justify-center items-center">
                 <svg
                   className="animate-spin h-5 w-5 text-white"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <circle
                     className="opacity-25"
@@ -216,7 +255,7 @@ const ContactForm: React.FC = () => {
                 <span className="ml-2">Submitting...</span>
               </div>
             ) : (
-              "Submit Callback Request"
+              'Submit Callback Request'
             )}
           </button>
         </form>

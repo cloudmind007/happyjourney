@@ -112,7 +112,7 @@ export default function AddVendor({
 }: IndiProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrlPreview, setLogoUrlPreview] = useState<string | null>(null);
-  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  // const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [stationsList, setStationsList] = useState<Station[]>([]);
   const [showPassword, setShowPassword] = useState(false);
 

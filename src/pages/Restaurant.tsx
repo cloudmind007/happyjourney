@@ -520,4 +520,4 @@ const Restaurant: FC = () => {
   );
 };
 
-export default Restaurant;
+export default Restaurant;  

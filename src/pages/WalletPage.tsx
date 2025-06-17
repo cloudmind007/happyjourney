@@ -1,5 +1,4 @@
-import React from "react";
-import { Wallet, CreditCard, History, PlusCircle } from "lucide-react";
+  import { Wallet, CreditCard, History, PlusCircle } from "lucide-react";
 
 const WalletPage = () => {
   return (

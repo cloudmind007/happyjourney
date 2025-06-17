@@ -1,9 +1,9 @@
+import { Restaurant } from "@mui/icons-material";
 import {
   LayoutDashboard,
   UtensilsCrossed,
   Users,
   ShoppingCart,
-  MapPin,
   Home,
   Wallet,
   History,
@@ -15,6 +15,10 @@ import {
   HelpCircle,
   LucideIcon,
   Phone,
+  AlertTriangle,
+  Package,
+  PhoneIncoming,
+  Train,
 } from "lucide-react";
 
 export type MenuItem = {
@@ -25,17 +29,11 @@ export type MenuItem = {
 
 export const adminMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: UtensilsCrossed, label: "Restaurant", path: "/restaurant" },
-  { icon: Users, label: "Customers", path: "/customers" },
-  { icon: MapPin, label: "Station", path: "/stations" },
-  { icon: MapPin, label: "Station", path: "/stations" },
-  { icon: MapPin, label: "Callback request", path: "/callbackrequests" },
-  { icon: MapPin, label: "Complaints", path: "/complaints" },
-  { icon: MapPin, label: "BulkOrder", path: "/bulkorder" },
-
-
-  { icon: MapPin, label: "", path: "/" },
-
+  { icon: Restaurant, label: "Restaurant", path: "/restaurant" }, // UtensilsCrossed → Restaurant (more recognizable)
+  { icon: Train, label: "Stations", path: "/stations" }, // MapPin → Train (if stations are transport-related)
+  { icon: PhoneIncoming, label: "Callback Requests", path: "/contactrequests" }, // PhoneCallback → PhoneIncoming
+  { icon: AlertTriangle, label: "Complaints", path: "/complaints" }, // AlertCircle → AlertTriangle (more urgent)
+  { icon: Package, label: "Bulk Orders", path: "/bulkorder" }, // BulkOrder → "Bulk Orders" (better readability)
 ];
 
 export const vendorMenuItems: MenuItem[] = [
@@ -49,7 +47,7 @@ export const userMenuItems: MenuItem[] = [
   { icon: ShoppingCart, label: "My Orders", path: "/orders" },
   { icon: Wallet, label: "Wallet", path: "/wallet" },
   { icon: History, label: "Order History", path: "/order-history" },
-  { icon: AlertCircle, label: "Complaint", path: "/complaints" },  
+  { icon: AlertCircle, label: "Complaint", path: "/createcomplaint" },  
   { icon: MessageSquare, label: "Feedback", path: "/feedback" },
   { icon: Shield, label: "Privacy Policy", path: "/privacy-policy" },
   { icon: XCircle, label: "Cancellation Policy", path: "/cancellation-policy" },

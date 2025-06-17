@@ -122,7 +122,7 @@ const ComplaintForm: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-gray-100 justify-center items-center p-4 sm:p-6">
       <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 w-full max-w-md">
-        <h2 className="text-2xl sm:text-3xl font-bold text-blue-600 mb-6">
+        <h2 className="text-2xl sm:text-3xl font-bold text-black-600 mb-6">
           Submit a Complaint
         </h2>
         <form onSubmit={handleSubmit} className="space-y-5">
