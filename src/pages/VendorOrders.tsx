@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
-
   FaRupeeSign,
   FaDownload,
   FaMapMarkerAlt,
@@ -9,7 +8,16 @@ import {
 } from "react-icons/fa";
 import { MdPayment, MdFastfood } from "react-icons/md";
 import { IoTime, IoChevronDown, IoChevronUp } from "react-icons/io5";
-import { CheckCircle, XCircle, Clock, Loader2, CreditCard, Wallet, Truck, ChefHat } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Loader2,
+  CreditCard,
+  Wallet,
+  Truck,
+  ChefHat,
+} from "lucide-react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import api from "@/utils/axios";
@@ -20,7 +28,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
@@ -180,7 +194,6 @@ const VendorOrders: React.FC = () => {
   const [activeOrders, setActiveOrders] = useState<OrderDTO[]>([]);
   const [historicalOrders, setHistoricalOrders] = useState<OrderDTO[]>([]);
   const [stationData, setStationData] = useState<{ [key: number]: StationDTO }>({});
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
@@ -188,129 +201,167 @@ const VendorOrders: React.FC = () => {
   const [statusRemarks, setStatusRemarks] = useState<{ [key: number]: string }>({});
   const [codRemarks, setCodRemarks] = useState<{ [key: number]: string }>({});
 
-  useEffect(() => {
-    const fetchOrdersAndData = async () => {
-      if (!userId || !accessToken) {
-        setError("Authentication required. Please log in as a vendor.");
+  const fetchOrdersAndData = useCallback(async () => {
+    if (!userId || !accessToken) {
+      setError("Authentication required. Please log in as a vendor.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Fetch active and historical orders
+      const [activeResponse, historicalResponse] = await Promise.all([
+        api.get<PageResponse<OrderDTO>>("/orders/vendor/active", {
+          params: { page: 0, size: 100 },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }).catch((err) => {
+          console.error("Failed to fetch active orders:", err);
+          return { data: { content: [], pageable: { pageNumber: 0, pageSize: 100 }, totalElements: 0, totalPages: 0 } };
+        }),
+        api.get<PageResponse<OrderDTO>>("/orders/vendor/historical", {
+          params: { page: 0, size: 100 },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }).catch((err) => {
+          console.error("Failed to fetch historical orders:", err);
+          return { data: { content: [], pageable: { pageNumber: 0, pageSize: 100 }, totalElements: 0, totalPages: 0 } };
+        }),
+      ]);
+
+      const activeOrdersData = activeResponse.data.content || [];
+      const historicalOrdersData = historicalResponse.data.content || [];
+      const allOrders = [...activeOrdersData, ...historicalOrdersData];
+
+      console.log("Active Orders:", activeOrdersData);
+      console.log("Historical Orders:", historicalOrdersData);
+
+      if (allOrders.length === 0) {
+        setActiveOrders([]);
+        setHistoricalOrders([]);
         setLoading(false);
         return;
       }
 
-      setLoading(true);
-      setError(null);
+      // Fetch additional data
+      const stationIds = [...new Set(allOrders.map((o) => o.deliveryStationId))];
+      const itemIds = [...new Set(allOrders.flatMap((o) => o.items.map((i) => i.itemId)))];
+      const vendorIds = [...new Set(allOrders.map((o) => o.vendorId))];
 
-      try {
-        // Fetch active and historical orders
-        const [activeResponse, historicalResponse] = await Promise.all([
-          api.get<PageResponse<OrderDTO>>("/orders/vendor/active", {
-            params: { page: 0, size: 100 },
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }),
-          api.get<PageResponse<OrderDTO>>("/orders/vendor/historical", {
-            params: { page: 0, size: 100 },
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }),
-        ]);
+      const [stations, items, vendors] = await Promise.all([
+        Promise.all(
+          stationIds.map((id) =>
+            api
+              .get<StationDTO>(`/stations/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+              .then((res) => {
+                console.log(`Fetched station ${id}:`, res.data);
+                return { [id]: res.data };
+              })
+              .catch((err) => {
+                console.error(`Failed to fetch station ${id}:`, err);
+                return {
+                  [id]: {
+                    stationId: id,
+                    stationName: `Station #${id}`,
+                    stationCode: "Unknown",
+                    city: "Unknown",
+                    state: "Unknown",
+                  },
+                };
+              })
+          )
+        ).then((results) => Object.assign({}, ...results)),
+        Promise.all(
+          itemIds.map((id) =>
+            api
+              .get<MenuItemDTO>(`/menu/items/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+              .then((res) => {
+                console.log(`Fetched item ${id}:`, res.data);
+                return { [id]: res.data };
+              })
+              .catch((err) => {
+                console.error(`Failed to fetch item ${id}:`, err);
+                return {
+                  [id]: {
+                    itemId: id,
+                    itemName: `Item #${id}`,
+                    description: "Unknown",
+                    category: "Unknown",
+                    imageUrl: null,
+                  },
+                };
+              })
+          )
+        ).then((results) => Object.assign({}, ...results)),
+        Promise.all(
+          vendorIds.map((id) =>
+            api
+              .get<VendorDTO>(`/vendors/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+              .then((res) => {
+                console.log(`Fetched vendor ${id}:`, res.data);
+                return { [id]: res.data };
+              })
+              .catch((err) => {
+                console.error(`Failed to fetch vendor ${id}:`, err);
+                return { [id]: { vendorId: id, businessName: `Vendor #${id}` } };
+              })
+          )
+        ).then((results) => Object.assign({}, ...results)),
+      ]);
 
-        const activeOrdersData = activeResponse.data.content || [];
-        const historicalOrdersData = historicalResponse.data.content || [];
-        const allOrders = [...activeOrdersData, ...historicalOrdersData];
+      console.log("Fetched Stations:", stations);
+      console.log("Fetched Items:", items);
+      console.log("Fetched Vendors:", vendors);
 
-        console.log("Active Orders:", activeOrdersData);
-        console.log("Historical Orders:", historicalOrdersData);
+      // Update state with fetched data
+      setStationData((prev) => ({ ...prev, ...stations }));
 
-        if (allOrders.length === 0) {
-          setActiveOrders([]);
-          setHistoricalOrders([]);
-          setLoading(false);
-          return;
-        }
+      // Transform orders
+      const transformedOrders = allOrders.map((order) => ({
+        ...order,
+        vendorName: vendors[order.vendorId]?.businessName || `Vendor #${order.vendorId}`,
+        trainNumber: order.trainNumber || `Train #${order.trainId}`,
+        items: order.items.map((item) => ({
+          ...item,
+          itemName: items[item.itemId]?.itemName || `Item #${item.itemId}`,
+          category: items[item.itemId]?.category || "Unknown",
+          imageUrl: items[item.itemId]?.imageUrl || null,
+          specialInstructions: item.specialInstructions || "No special instructions",
+        })),
+      }));
 
-        // Fetch additional data
-        const stationIds = [...new Set(allOrders.map((o) => o.deliveryStationId))];
-        const itemIds = [...new Set(allOrders.flatMap((o) => o.items.map((i) => i.itemId)))];
-        const vendorIds = [...new Set(allOrders.map((o) => o.vendorId))];
+      console.log("Transformed Orders:", transformedOrders);
 
-        const [stations, items, vendors] = await Promise.all([
-          Promise.all(
-            stationIds.map((id) =>
-              api
-                .get<StationDTO>(`/stations/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })
-                .then((res) => ({ [id]: res.data }))
-                .catch((err) => {
-                  console.error(`Failed to fetch station ${id}:`, err);
-                  return {
-                    [id]: { stationId: id, stationName: `Station #${id}`, stationCode: "Unknown", city: "Unknown", state: "Unknown" },
-                  };
-                })
-            )
-          ).then((results) => Object.assign({}, ...results)),
-          Promise.all(
-            itemIds.map((id) =>
-              api
-                .get<MenuItemDTO>(`/menu/items/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })
-                .then((res) => ({ [id]: res.data }))
-                .catch((err) => {
-                  console.error(`Failed to fetch item ${id}:`, err);
-                  return {
-                    [id]: { itemId: id, itemName: `Item #${id}`, description: "Unknown", category: "Unknown", imageUrl: null },
-                  };
-                })
-            )
-          ).then((results) => Object.assign({}, ...results)),
-          Promise.all(
-            vendorIds.map((id) =>
-              api
-                .get<VendorDTO>(`/vendors/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })
-                .then((res) => ({ [id]: res.data }))
-                .catch((err) => {
-                  console.error(`Failed to fetch vendor ${id}:`, err);
-                  return { [id]: { vendorId: id, businessName: `Vendor #${id}` } };
-                })
-            )
-          ).then((results) => Object.assign({}, ...results)),
-        ]);
-
-        console.log("Fetched Stations:", stations);
-        console.log("Fetched Items:", items);
-        console.log("Fetched Vendors:", vendors);
-
-        // Update state with fetched data
-        setStationData((prev) => ({ ...prev, ...stations }));
-
-
-        // Transform orders
-        const transformedOrders = allOrders.map((order) => ({
-          ...order,
-          vendorName: vendors[order.vendorId]?.businessName || `Vendor #${order.vendorId}`,
-          trainNumber: order.trainNumber || `Train #${order.trainId}`,
-          items: order.items.map((item) => ({
-            ...item,
-            itemName: items[item.itemId]?.itemName || `Item #${item.itemId}`,
-            category: items[item.itemId]?.category || "Unknown",
-            imageUrl: items[item.itemId]?.imageUrl || null,
-            specialInstructions: item.specialInstructions || "No special instructions",
-          })),
-        }));
-
-        console.log("Transformed Orders:", transformedOrders);
-
-        setActiveOrders(
-          transformedOrders.filter((o) => ["PLACED", "PENDING", "PREPARING", "DISPATCHED"].includes(o.orderStatus))
-        );
-        setHistoricalOrders(transformedOrders.filter((o) => ["DELIVERED", "CANCELLED"].includes(o.orderStatus)));
-      } catch (err: any) {
-        console.error("Order fetch error:", err);
-        setError(err.response?.data?.message || "Failed to fetch orders. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrdersAndData();
+      setActiveOrders(
+        transformedOrders.filter((o) =>
+          ["PLACED", "PENDING", "PREPARING", "DISPATCHED"].includes(o.orderStatus)
+        )
+      );
+      setHistoricalOrders(
+        transformedOrders.filter((o) => ["DELIVERED", "CANCELLED"].includes(o.orderStatus))
+      );
+    } catch (err: any) {
+      console.error("Order fetch error:", err);
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to fetch orders. Please check your connection or try again later."
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [userId, accessToken]);
 
-  const updateOrderStatus = async (orderId: number, status: OrderDTO["orderStatus"], remarks: string) => {
+  useEffect(() => {
+    fetchOrdersAndData();
+  }, [fetchOrdersAndData]);
+
+  const updateOrderStatus = async (
+    orderId: number,
+    status: OrderDTO["orderStatus"],
+    remarks: string
+  ) => {
     if (!userId || !accessToken) {
       toast.error("Authentication required. Please log in as a vendor.");
       return;
@@ -330,31 +381,44 @@ const VendorOrders: React.FC = () => {
         }
       );
 
-      // Update the order in state
+      console.log(`Updated order ${orderId} status:`, response.data);
+
+      // Update state
       setActiveOrders((prev) =>
         prev.map((order) =>
-          order.orderId === orderId ? { ...order, orderStatus: response.data.orderStatus } : order
+          order.orderId === orderId
+            ? { ...order, orderStatus: response.data.orderStatus }
+            : order
         )
       );
       setHistoricalOrders((prev) =>
         prev.map((order) =>
-          order.orderId === orderId ? { ...order, orderStatus: response.data.orderStatus } : order
+          order.orderId === orderId
+            ? { ...order, orderStatus: response.data.orderStatus }
+            : order
         )
       );
 
-      // Move order to historical if DELIVERED
+      // Move to historical if DELIVERED
       if (status === "DELIVERED") {
-        setActiveOrders((prev) => prev.filter((order) => order.orderId !== orderId));
+        setActiveOrders((prev) =>
+          prev.filter((order) => order.orderId !== orderId)
+        );
         setHistoricalOrders((prev) => [
           ...prev,
-          { ...activeOrders.find((o) => o.orderId === orderId)!, orderStatus: "DELIVERED" },
+          {
+            ...activeOrders.find((o) => o.orderId === orderId)!,
+            orderStatus: "DELIVERED",
+          },
         ]);
       }
 
       toast.success(`Status for order ${orderId} updated to ${status}.`);
     } catch (err: any) {
       console.error(`Failed to update status for order ${orderId}:`, err);
-      toast.error(err.response?.data?.message || "Failed to update order status.");
+      toast.error(
+        err.response?.data?.message || "Failed to update order status."
+      );
     }
   };
 
@@ -377,22 +441,30 @@ const VendorOrders: React.FC = () => {
         }
       );
 
-      // Update the order in state
+      console.log(`Marked COD payment for order ${orderId} as completed`);
+
+      // Update state
       setActiveOrders((prev) =>
         prev.map((order) =>
-          order.orderId === orderId ? { ...order, paymentStatus: "COMPLETED" } : order
+          order.orderId === orderId
+            ? { ...order, paymentStatus: "COMPLETED" }
+            : order
         )
       );
       setHistoricalOrders((prev) =>
         prev.map((order) =>
-          order.orderId === orderId ? { ...order, paymentStatus: "COMPLETED" } : order
+          order.orderId === orderId
+            ? { ...order, paymentStatus: "COMPLETED" }
+            : order
         )
       );
 
       toast.success(`COD payment for order ${orderId} marked as completed.`);
     } catch (err: any) {
       console.error(`Failed to mark COD payment for order ${orderId}:`, err);
-      toast.error(err.response?.data?.message || "Failed to mark COD payment as completed.");
+      toast.error(
+        err.response?.data?.message || "Failed to mark COD payment as completed."
+      );
     }
   };
 
@@ -401,12 +473,6 @@ const VendorOrders: React.FC = () => {
       orientation: "portrait",
       unit: "mm",
       format: "a4",
-    });
-
-    autoTable(doc, {
-      startY: 102,
-      head: [],
-      body: [],
     });
 
     doc.setFontSize(22);
@@ -435,14 +501,30 @@ const VendorOrders: React.FC = () => {
     doc.setTextColor(0, 0, 0);
     const station = stationData[order.deliveryStationId];
     doc.text(
-      `Station: ${station ? `${station.stationName} (${station.stationCode})` : `Station #${order.deliveryStationId}`}`,
+      `Station: ${
+        station
+          ? `${station.stationName} (${station.stationCode})`
+          : `Station #${order.deliveryStationId}`
+      }`,
       14,
       68
     );
-    doc.text(`Train: ${order.trainNumber || `Train #${order.trainId}`}`, 14, 72);
-    doc.text(`Coach/Seat: ${order.coachNumber}/${order.seatNumber}`, 14, 76);
+    doc.text(
+      `Train: ${order.trainNumber || `Train #${order.trainId}`}`,
+      14,
+      72
+    );
+    doc.text(
+      `Coach/Seat: ${order.coachNumber}/${order.seatNumber}`,
+      14,
+      76
+    );
     doc.text(`Delivery Time: ${formatDate(order.deliveryTime, true)}`, 14, 80);
-    doc.text(`Vendor: ${order.vendorName || `Vendor #${order.vendorId}`}`, 14, 84);
+    doc.text(
+      `Vendor: ${order.vendorName || `Vendor #${order.vendorId}`}`,
+      14,
+      84
+    );
 
     if (order.deliveryInstructions) {
       doc.text(`Instructions: ${order.deliveryInstructions}`, 14, 88);
@@ -455,7 +537,7 @@ const VendorOrders: React.FC = () => {
     const headers = [["No.", "Item", "Qty", "Unit Price", "Total", "Notes"]];
     const data = order.items.map((item, index) => [
       index + 1,
-      item.itemName,
+      item.itemName || `Item #${item.itemId}`,
       item.quantity,
       `₹${item.unitPrice.toFixed(2)}`,
       `₹${(item.quantity * item.unitPrice).toFixed(2)}`,
@@ -465,7 +547,7 @@ const VendorOrders: React.FC = () => {
     autoTable(doc, {
       startY: 102,
       head: headers,
-      body: data as any,
+      body: data,
       theme: "grid",
       headStyles: {
         fillColor: [30, 64, 175],
@@ -494,17 +576,47 @@ const VendorOrders: React.FC = () => {
 
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    doc.text(`Subtotal: ₹${order.totalAmount.toFixed(2)}`, 150, finalY + 6, { align: "right" });
-    doc.text(`Delivery Charges: ₹${order.deliveryCharges.toFixed(2)}`, 150, finalY + 12, { align: "right" });
-    doc.text(`Tax (${order.taxPercentage || 5}%): ₹${order.taxAmount.toFixed(2)}`, 150, finalY + 18, { align: "right" });
+    doc.text(
+      `Subtotal: ₹${order.totalAmount.toFixed(2)}`,
+      150,
+      finalY + 6,
+      { align: "right" }
+    );
+    doc.text(
+      `Delivery Charges: ₹${order.deliveryCharges.toFixed(2)}`,
+      150,
+      finalY + 12,
+      { align: "right" }
+    );
+    doc.text(
+      `Tax (${order.taxPercentage || 5}%): ₹${order.taxAmount.toFixed(2)}`,
+      150,
+      finalY + 18,
+      { align: "right" }
+    );
 
     if (order.discountAmount && order.discountAmount > 0) {
-      doc.text(`Discount: -₹${order.discountAmount.toFixed(2)}`, 150, finalY + 24, { align: "right" });
+      doc.text(
+        `Discount: -₹${order.discountAmount.toFixed(2)}`,
+        150,
+        finalY + 24,
+        { align: "right" }
+      );
       doc.setFont("helvetica", "bold");
-      doc.text(`Total Amount: ₹${order.finalAmount.toFixed(2)}`, 150, finalY + 32, { align: "right" });
+      doc.text(
+        `Total Amount: ₹${order.finalAmount.toFixed(2)}`,
+        150,
+        finalY + 32,
+        { align: "right" }
+      );
     } else {
       doc.setFont("helvetica", "bold");
-      doc.text(`Total Amount: ₹${order.finalAmount.toFixed(2)}`, 150, finalY + 24, { align: "right" });
+      doc.text(
+        `Total Amount: ₹${order.finalAmount.toFixed(2)}`,
+        150,
+        finalY + 24,
+        { align: "right" }
+      );
     }
 
     doc.setFont("helvetica", "normal");
@@ -513,8 +625,16 @@ const VendorOrders: React.FC = () => {
 
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    doc.text(`Method: ${paymentMethodConfig[order.paymentMethod].label}`, 14, finalY + 48);
-    doc.text(`Status: ${paymentConfig[order.paymentStatus].label}`, 14, finalY + 52);
+    doc.text(
+      `Method: ${paymentMethodConfig[order.paymentMethod].label}`,
+      14,
+      finalY + 48
+    );
+    doc.text(
+      `Status: ${paymentConfig[order.paymentStatus].label}`,
+      14,
+      finalY + 52
+    );
 
     if (order.razorpayOrderID) {
       doc.text(`Transaction ID: ${order.razorpayOrderID}`, 14, finalY + 56);
@@ -522,8 +642,18 @@ const VendorOrders: React.FC = () => {
 
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text("Thank you for choosing Railway Eats!", 105, 280, { align: "center" });
-    doc.text("For any queries, please contact support@railwayeats.com", 105, 284, { align: "center" });
+    doc.text(
+      "Thank you for choosing Railway Eats!",
+      105,
+      280,
+      { align: "center" }
+    );
+    doc.text(
+      "For any queries, please contact support@railwayeats.com",
+      105,
+      284,
+      { align: "center" }
+    );
 
     doc.save(`RelSwad_Invoice_${order.orderId}.pdf`);
   };
@@ -538,11 +668,15 @@ const VendorOrders: React.FC = () => {
   };
 
   const formatDate = (dateString: string, forPdf = false) => {
-    const date = new Date(dateString);
-    if (forPdf) {
-      return format(date, "dd MMM yyyy, hh:mm a");
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return "Invalid Date";
+      }
+      return format(date, forPdf ? "dd MMM yyyy, hh:mm a" : "PPPp");
+    } catch {
+      return "Invalid Date";
     }
-    return format(date, "PPPp");
   };
 
   const getOrderProgress = (status: OrderDTO["orderStatus"]) => {
@@ -568,11 +702,17 @@ const VendorOrders: React.FC = () => {
   };
 
   const canUpdateStatus = (order: OrderDTO) => {
-    return ["PLACED", "PENDING", "PREPARING", "DISPATCHED"].includes(order.orderStatus);
+    return ["PLACED", "PENDING", "PREPARING", "DISPATCHED"].includes(
+      order.orderStatus
+    );
   };
 
   const getAvailableStatuses = (currentStatus: OrderDTO["orderStatus"]) => {
-    const statuses: OrderDTO["orderStatus"][] = ["PREPARING", "DISPATCHED", "DELIVERED"];
+    const statuses: OrderDTO["orderStatus"][] = [
+      "PREPARING",
+      "DISPATCHED",
+      "DELIVERED",
+    ];
     if (currentStatus === "PLACED" || currentStatus === "PENDING") {
       return statuses.filter((s) => s === "PREPARING");
     }
@@ -597,7 +737,10 @@ const VendorOrders: React.FC = () => {
         </div>
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+            <div
+              key={i}
+              className="bg-white rounded-lg shadow-sm p-6 space-y-4"
+            >
               <div className="flex justify-between">
                 <Skeleton className="h-6 w-32" />
                 <Skeleton className="h-6 w-24" />
@@ -623,14 +766,27 @@ const VendorOrders: React.FC = () => {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Vendor Orders</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            Vendor Orders
+          </h1>
           <p className="text-sm text-gray-500 mt-1">
-            {activeTab === "active" ? "Your current and upcoming orders" : "Your completed order history"}
+            {activeTab === "active"
+              ? "Your current and upcoming orders"
+              : "Your completed order history"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => { /* fetchOrdersAndData is not defined */ }} disabled={loading}>
-            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Refresh"}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchOrdersAndData}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              "Refresh"
+            )}
           </Button>
           <div className="inline-flex rounded-lg border border-gray-200 bg-white">
             <button
@@ -662,12 +818,23 @@ const VendorOrders: React.FC = () => {
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-50">
             <XCircle className="h-6 w-6 text-red-600" />
           </div>
-          <h3 className="mt-3 text-lg font-medium text-gray-900">Error loading orders</h3>
+          <h3 className="mt-3 text-lg font-medium text-gray-900">
+            Error loading orders
+          </h3>
           <p className="mt-2 text-sm text-gray-500">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => { /* fetchOrdersAndData is not defined */ }} disabled={loading}>
-            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Try Again"}
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={fetchOrdersAndData}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              "Try Again"
+            )}
           </Button>
-        </div>  
+        </div>
       ) : currentOrders.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-6 text-center border border-gray-100">
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-50">
@@ -677,7 +844,9 @@ const VendorOrders: React.FC = () => {
             No {activeTab === "active" ? "active" : "completed"} orders found
           </h3>
           <p className="mt-2 text-sm text-gray-500">
-            {activeTab === "active" ? "Your upcoming orders will appear here" : "Your completed orders will appear here"}
+            {activeTab === "active"
+              ? "Your upcoming orders will appear here"
+              : "Your completed orders will appear here"}
           </p>
         </div>
       ) : (
@@ -694,8 +863,15 @@ const VendorOrders: React.FC = () => {
                 <div className="flex flex-col sm:flex-row justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3">
-                      <h2 className="text-lg font-semibold text-gray-900">Order #{order.orderId}</h2>
-                      <Badge variant="outline" className={`${statusConfig[order.orderStatus].color} py-1 px-2.5`}>
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        Order #{order.orderId}
+                      </h2>
+                      <Badge
+                        variant="outline"
+                        className={`${
+                          statusConfig[order.orderStatus].color
+                        } py-1 px-2.5`}
+                      >
                         <div className="flex items-center gap-1.5">
                           {statusConfig[order.orderStatus].icon}
                           <span>{statusConfig[order.orderStatus].label}</span>
@@ -715,12 +891,16 @@ const VendorOrders: React.FC = () => {
                             {stationData[order.deliveryStationId].stationCode})
                           </TooltipTrigger>
                           <TooltipContent>
-                            {stationData[order.deliveryStationId].city}, {stationData[order.deliveryStationId].state}
+                            {stationData[order.deliveryStationId].city},{" "}
+                            {stationData[order.deliveryStationId].state}
                           </TooltipContent>
                         </Tooltip>
                       ) : (
                         <span className="flex items-center gap-1">
-                          <Badge variant="destructive" className="py-0.5 px-1 text-xs">
+                          <Badge
+                            variant="destructive"
+                            className="py-0.5 px-1 text-xs"
+                          >
                             Missing
                           </Badge>
                           Station #{order.deliveryStationId}
@@ -754,7 +934,11 @@ const VendorOrders: React.FC = () => {
                   <div className="mt-4">
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
                       <span>Order Placed</span>
-                      <span>{order.orderStatus === "DELIVERED" ? "Delivered" : "In Progress"}</span>
+                      <span>
+                        {order.orderStatus === "DELIVERED"
+                          ? "Delivered"
+                          : "In Progress"}
+                      </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
@@ -787,16 +971,26 @@ const VendorOrders: React.FC = () => {
                               {stationData[order.deliveryStationId] ? (
                                 <Tooltip>
                                   <TooltipTrigger>
-                                    {stationData[order.deliveryStationId].stationName} (
-                                    {stationData[order.deliveryStationId].stationCode})
+                                    {stationData[order.deliveryStationId]
+                                      .stationName}{" "}
+                                    (
+                                    {
+                                      stationData[order.deliveryStationId]
+                                        .stationCode
+                                    }
+                                    )
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    {stationData[order.deliveryStationId].city}, {stationData[order.deliveryStationId].state}
+                                    {stationData[order.deliveryStationId].city},{" "}
+                                    {stationData[order.deliveryStationId].state}
                                   </TooltipContent>
                                 </Tooltip>
                               ) : (
                                 <span className="flex items-center gap-1">
-                                  <Badge variant="destructive" className="py-0.5 px-1 text-xs">
+                                  <Badge
+                                    variant="destructive"
+                                    className="py-0.5 px-1 text-xs"
+                                  >
                                     Missing
                                   </Badge>
                                   Station #{order.deliveryStationId}
@@ -806,10 +1000,14 @@ const VendorOrders: React.FC = () => {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Train</span>
-                            <span className="text-sm font-medium">{order.trainNumber || `Train #${order.trainId}`}</span>
+                            <span className="text-sm font-medium">
+                              {order.trainNumber || `Train #${order.trainId}`}
+                            </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Coach/Seat</span>
+                            <span className="text-sm text-gray-500">
+                              Coach/Seat
+                            </span>
                             <span className="text-sm font-medium">
                               {order.coachNumber}/{order.seatNumber}
                             </span>
@@ -820,12 +1018,17 @@ const VendorOrders: React.FC = () => {
                               {order.vendorName?.includes("Vendor #") ? (
                                 <Tooltip>
                                   <TooltipTrigger>
-                                    <Badge variant="destructive" className="py-0.5 px-1 text-xs">
+                                    <Badge
+                                      variant="destructive"
+                                      className="py-0.5 px-1 text-xs"
+                                    >
                                       Missing
                                     </Badge>
                                     {order.vendorName}
                                   </TooltipTrigger>
-                                  <TooltipContent>Vendor data not found</TooltipContent>
+                                  <TooltipContent>
+                                    Vendor data not found
+                                  </TooltipContent>
                                 </Tooltip>
                               ) : (
                                 order.vendorName
@@ -833,12 +1036,18 @@ const VendorOrders: React.FC = () => {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Delivery Time</span>
-                            <span className="text-sm font-medium">{formatDate(order.deliveryTime)}</span>
+                            <span className="text-sm text-gray-500">
+                              Delivery Time
+                            </span>
+                            <span className="text-sm font-medium">
+                              {formatDate(order.deliveryTime)}
+                            </span>
                           </div>
                           {order.deliveryInstructions && (
                             <div className="flex justify-between">
-                              <span className="text-sm text-gray-500">Instructions</span>
+                              <span className="text-sm text-gray-500">
+                                Instructions
+                              </span>
                               <span className="text-sm font-medium text-right max-w-xs">
                                 {order.deliveryInstructions}
                               </span>
@@ -853,32 +1062,44 @@ const VendorOrders: React.FC = () => {
                         </h3>
                         <div className="border rounded-lg divide-y">
                           {order.items.map((item) => (
-                            <div key={`${order.orderId}-${item.itemId}`} className="p-3">
+                            <div
+                              key={`${order.orderId}-${item.itemId}`}
+                              className="p-3"
+                            >
                               <div className="flex justify-between">
                                 <div>
                                   <p className="font-medium flex items-center gap-2">
                                     {item.itemName?.includes("Item #") ? (
                                       <Tooltip>
                                         <TooltipTrigger>
-                                          <Badge variant="destructive" className="py-0.5 px-1 text-xs">
+                                          <Badge
+                                            variant="destructive"
+                                            className="py-0.5 px-1 text-xs"
+                                          >
                                             Missing
                                           </Badge>
                                           {item.itemName}
                                         </TooltipTrigger>
-                                        <TooltipContent>Item data not found</TooltipContent>
+                                        <TooltipContent>
+                                          Item data not found
+                                        </TooltipContent>
                                       </Tooltip>
                                     ) : (
                                       item.itemName
                                     )}
-                                    {item.category && item.category !== "Unknown" && (
-                                      <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                                        {item.category}
-                                      </span>
-                                    )}
+                                    {item.category &&
+                                      item.category !== "Unknown" && (
+                                        <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                          {item.category}
+                                        </span>
+                                      )}
                                   </p>
                                   {item.specialInstructions &&
-                                    item.specialInstructions !== "No special instructions" && (
-                                      <p className="text-xs text-gray-500 mt-1">Note: {item.specialInstructions}</p>
+                                    item.specialInstructions !==
+                                      "No special instructions" && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        Note: {item.specialInstructions}
+                                      </p>
                                     )}
                                 </div>
                                 <div className="text-right">
@@ -904,7 +1125,11 @@ const VendorOrders: React.FC = () => {
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Method</span>
                             <span className="text-sm font-medium flex items-center gap-1.5">
-                              <span className={paymentMethodConfig[order.paymentMethod].color}>
+                              <span
+                                className={
+                                  paymentMethodConfig[order.paymentMethod].color
+                                }
+                              >
                                 {paymentMethodConfig[order.paymentMethod].icon}
                               </span>
                               {paymentMethodConfig[order.paymentMethod].label}
@@ -914,36 +1139,54 @@ const VendorOrders: React.FC = () => {
                             <span className="text-sm text-gray-500">Status</span>
                             <Badge
                               variant="outline"
-                              className={`${paymentConfig[order.paymentStatus].color} py-1 px-2.5`}
+                              className={`${
+                                paymentConfig[order.paymentStatus].color
+                              } py-1 px-2.5`}
                             >
                               <div className="flex items-center gap-1.5">
                                 {paymentConfig[order.paymentStatus].icon}
-                                <span>{paymentConfig[order.paymentStatus].label}</span>
+                                <span>
+                                  {paymentConfig[order.paymentStatus].label}
+                                </span>
                               </div>
                             </Badge>
                           </div>
                           {order.razorpayOrderID && (
                             <div className="flex justify-between">
-                              <span className="text-sm text-gray-500">Transaction ID</span>
-                              <span className="text-sm font-medium font-mono">{order.razorpayOrderID}</span>
+                              <span className="text-sm text-gray-500">
+                                Transaction ID
+                              </span>
+                              <span className="text-sm font-medium font-mono">
+                                {order.razorpayOrderID}
+                              </span>
                             </div>
                           )}
                           {order.paymentMethod === "COD" &&
                             order.paymentStatus === "PENDING" &&
                             activeTab === "active" && (
                               <div className="mt-4">
-                                <h4 className="text-sm font-medium text-gray-700">Mark COD Payment</h4>
+                                <h4 className="text-sm font-medium text-gray-700">
+                                  Mark COD Payment
+                                </h4>
                                 <div className="flex gap-2 mt-2">
                                   <Input
                                     placeholder="Optional remarks"
                                     value={codRemarks[order.orderId] || ""}
                                     onChange={(e) =>
-                                      setCodRemarks((prev: { [key: number]: string }) => ({ ...prev, [order.orderId]: e.target.value }))
+                                      setCodRemarks((prev) => ({
+                                        ...prev,
+                                        [order.orderId]: e.target.value,
+                                      }))
                                     }
                                     className="max-w-xs"
                                   />
                                   <Button
-                                    onClick={() => markCodPaymentCompleted(order.orderId, codRemarks[order.orderId] || "")}
+                                    onClick={() =>
+                                      markCodPaymentCompleted(
+                                        order.orderId,
+                                        codRemarks[order.orderId] || ""
+                                      )
+                                    }
                                     className="gap-2"
                                   >
                                     <CheckCircle className="w-4 h-4" />
@@ -961,55 +1204,84 @@ const VendorOrders: React.FC = () => {
                         </h3>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Subtotal</span>
-                            <span className="text-sm font-medium">₹{order.totalAmount.toFixed(2)}</span>
+                            <span className="text-sm text-gray-500">
+                              Subtotal
+                            </span>
+                            <span className="text-sm font-medium">
+                              ₹{order.totalAmount.toFixed(2)}
+                            </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Delivery Charges</span>
-                            <span className="text-sm font-medium">₹{order.deliveryCharges.toFixed(2)}</span>
+                            <span className="text-sm text-gray-500">
+                              Delivery Charges
+                            </span>
+                            <span className="text-sm font-medium">
+                              ₹{order.deliveryCharges.toFixed(2)}
+                            </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Tax ({order.taxPercentage || 5}%)</span>
-                            <span className="text-sm font-medium">₹{order.taxAmount.toFixed(2)}</span>
+                            <span className="text-sm text-gray-500">
+                              Tax ({order.taxPercentage || 5}%)
+                            </span>
+                            <span className="text-sm font-medium">
+                              ₹{order.taxAmount.toFixed(2)}
+                            </span>
                           </div>
                           {order.discountAmount && order.discountAmount > 0 && (
                             <div className="flex justify-between">
-                              <span className="text-sm text-gray-500">Discount</span>
+                              <span className="text-sm text-gray-500">
+                                Discount
+                              </span>
                               <span className="text-sm font-medium text-green-600">
                                 -₹{order.discountAmount.toFixed(2)}
                               </span>
                             </div>
                           )}
                           <div className="pt-2 border-t border-gray-200 flex justify-between">
-                            <span className="text-base font-semibold">Total Amount</span>
-                            <span className="text-base font-semibold">₹{order.finalAmount.toFixed(2)}</span>
+                            <span className="text-base font-semibold">
+                              Total Amount
+                            </span>
+                            <span className="text-base font-semibold">
+                              ₹{order.finalAmount.toFixed(2)}
+                            </span>
                           </div>
                         </div>
                         {activeTab === "active" && canUpdateStatus(order) && (
                           <div className="mt-4">
-                            <h4 className="text-sm font-medium text-gray-700">Update Order Status</h4>
+                            <h4 className="text-sm font-medium text-gray-700">
+                              Update Order Status
+                            </h4>
                             <div className="flex gap-2 mt-2">
                               <Select
                                 onValueChange={(value) =>
-                                  updateOrderStatus(order.orderId, value as OrderDTO["orderStatus"], statusRemarks[order.orderId] || "")
+                                  updateOrderStatus(
+                                    order.orderId,
+                                    value as OrderDTO["orderStatus"],
+                                    statusRemarks[order.orderId] || ""
+                                  )
                                 }
                               >
                                 <SelectTrigger className="w-[180px]">
                                   <SelectValue placeholder="Select status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {getAvailableStatuses(order.orderStatus).map((status) => (
-                                    <SelectItem key={status} value={status}>
-                                      {statusConfig[status].label}
-                                    </SelectItem>
-                                  ))}
+                                  {getAvailableStatuses(order.orderStatus).map(
+                                    (status) => (
+                                      <SelectItem key={status} value={status}>
+                                        {statusConfig[status].label}
+                                      </SelectItem>
+                                    )
+                                  )}
                                 </SelectContent>
                               </Select>
                               <Input
                                 placeholder="Optional remarks"
                                 value={statusRemarks[order.orderId] || ""}
                                 onChange={(e) =>
-                                  setStatusRemarks((prev) => ({ ...prev, [order.orderId]: e.target.value }))
+                                  setStatusRemarks((prev) => ({
+                                    ...prev,
+                                    [order.orderId]: e.target.value,
+                                  }))
                                 }
                                 className="max-w-xs"
                               />
@@ -1017,11 +1289,17 @@ const VendorOrders: React.FC = () => {
                           </div>
                         )}
                         <div className="pt-4 flex justify-end gap-3">
-                          <Button variant="outline" onClick={() => toggleOrderDetails(order.orderId)}>
+                          <Button
+                            variant="outline"
+                            onClick={() => toggleOrderDetails(order.orderId)}
+                          >
                             Close Details
                           </Button>
                           {canDownloadInvoice(order) && (
-                            <Button onClick={() => generateInvoice(order)} className="gap-2">
+                            <Button
+                              onClick={() => generateInvoice(order)}
+                              className="gap-2"
+                            >
                               <FaDownload className="w-4 h-4" />
                               Download Invoice
                             </Button>
@@ -1040,4 +1318,4 @@ const VendorOrders: React.FC = () => {
   );
 };
 
-export default VendorOrders;
+export default VendorOrders
