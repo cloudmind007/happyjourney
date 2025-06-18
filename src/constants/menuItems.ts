@@ -4,10 +4,8 @@ import {
 
   ShoppingCart,
   Home,
-  Wallet,
   History,
   AlertCircle,
-  MessageSquare,
   Shield,
   XCircle,
   FileText,
