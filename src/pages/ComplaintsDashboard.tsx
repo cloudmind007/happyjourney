@@ -1,25 +1,15 @@
 import { FC, useEffect, useState, useCallback, useRef } from "react";
 import api from "../utils/axios";
-import LoaderModal from "../components/LoaderModal";
-import { Search, X } from "lucide-react";
-import Pagination from "../components/Pagination";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Box, Modal, Typography, IconButton, Select, MenuItem } from "@mui/material";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import Select from "react-select";
+import Pagination from "../components/Pagination";
 import { useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import debounce from "lodash.debounce";
-
-const modalStyle = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  width: "90%",
-  maxWidth: 600,
-  bgcolor: "background.paper",
-  borderRadius: 2,
-  p: 4,
-};
 
 interface Complaint {
   complaintId: number;
@@ -33,6 +23,19 @@ interface Complaint {
   createdAt: string;
   updatedAt: string | null;
 }
+
+const statusOptions = [
+  { value: "", label: "All Statuses" },
+  { value: "PENDING", label: "Pending" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "RESOLVED", label: "Resolved" },
+];
+
+const pageSizeOptions = [
+  { value: 10, label: "10 Records" },
+  { value: 25, label: "25 Records" },
+  { value: 50, label: "50 Records" },
+];
 
 const ComplaintsDashboard: FC = () => {
   const [listData, setListData] = useState<Complaint[]>([]);
@@ -159,11 +162,17 @@ const ComplaintsDashboard: FC = () => {
     debouncedNameFilter(value);
   };
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
+  const handleStatusChange = (selectedOption: any) => {
+    const value = selectedOption ? selectedOption.value : "";
     setStatusFilter(value);
     setPage((prev) => ({ ...prev, current_page: 1 }));
     getData(1, page.per_page, { name: nameFilter, status: value });
+  };
+
+  const handlePageSizeChange = (selectedOption: any) => {
+    const newSize = selectedOption ? selectedOption.value : 10;
+    setPage((prev) => ({ ...prev, per_page: newSize, current_page: 1 }));
+    getData(1, newSize, { name: nameFilter, status: statusFilter });
   };
 
   useEffect(() => {
@@ -188,145 +197,140 @@ const ComplaintsDashboard: FC = () => {
     }
   };
 
-  const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newSize = parseInt(e.target.value, 10);
-    if (newSize !== page.per_page) {
-      setPage((prev) => ({ ...prev, per_page: newSize, current_page: 1 }));
-      getData(1, newSize, { name: nameFilter, status: statusFilter });
-    }
-  };
-
   return (
-    <div className="overflow-x-auto">
+    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
       {loading ? (
-        <LoaderModal />
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-blue-600"></div>
+        </div>
       ) : (
-        <div className="h-full w-full">
-          <div className="flex flex-col sm:flex-row justify-between items-center bg-white px-4 py-4 gap-4 sm:gap-0 sm:py-0 sm:h-16">
-            <div className="w-full sm:w-auto">
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 w-full">
-                <div className="relative w-full sm:w-48">
-                  <div className="absolute inset-y-0 left-1 flex items-center ps-3 pointer-events-none">
-                    <Search className="size-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    id="nameFilter"
-                    ref={nameInputRef}
-                    className="w-full p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-3xl outline-none"
-                    placeholder="Name"
-                    value={nameInput}
-                    onChange={handleNameChange}
-                    onFocus={() => (activeInputRef.current = "name")}
-                  />
-                </div>
-                <select
-                  value={statusFilter}
-                  onChange={handleStatusChange}
-                  className="border border-gray-300 rounded-lg px-4 py-2 text-sm w-full sm:w-auto"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="RESOLVED">Resolved</option>
-                </select>
-                <select
-                  value={page.per_page}
-                  onChange={handlePageSizeChange}
-                  className="border border-gray-300 rounded-lg px-4 py-2 text-sm w-full sm:w-auto"
-                >
-                  <option value={10}>10 Records</option>
-                  <option value={25}>25 Records</option>
-                  <option value={50}>50 Records</option>
-                </select>
+        <Card className="w-full shadow-md border border-blue-100">
+          <CardHeader className="bg-blue-50">
+            <CardTitle className="text-xl sm:text-2xl font-bold text-blue-800">Complaints Dashboard</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-6">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="relative flex-1 sm:max-w-[200px]">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-blue-400 h-4 w-4" />
+                <Input
+                  ref={nameInputRef}
+                  type="text"
+                  placeholder="Search by name..."
+                  value={nameInput}
+                  onChange={handleNameChange}
+                  onFocus={() => (activeInputRef.current = "name")}
+                  className="pl-8 w-full text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500"
+                  aria-label="Search complaints by name"
+                />
               </div>
+              <Select
+                options={statusOptions}
+                value={statusOptions.find((option) => option.value === statusFilter)}
+                onChange={handleStatusChange}
+                placeholder="Filter by status"
+                className="w-full sm:w-[160px] text-sm"
+                classNamePrefix="select"
+                isClearable
+                aria-label="Filter complaints by status"
+              />
+              <Select
+                options={pageSizeOptions}
+                value={pageSizeOptions.find((option) => option.value === page.per_page)}
+                onChange={handlePageSizeChange}
+                placeholder="Records per page"
+                className="w-full sm:w-[160px] text-sm"
+                classNamePrefix="select"
+                aria-label="Select records per page"
+              />
             </div>
-          </div>
-          <div className="bg-gray-50 p-3">
+
             {listData.length > 0 ? (
-              <div className="p-4 bg-white overflow-x-auto">
+              <div className="overflow-x-auto">
                 {isMobile ? (
-                  <div className="space-y-4">
-                    {listData.map((item: Complaint, index) => (
-                      <div
-                        key={item.complaintId}
-                        className="p-4 bg-white shadow-md rounded-lg border border-gray-100"
-                      >
-                        <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div className="space-y-3">
+                    {listData.map((item, index) => (
+                      <Card key={item.complaintId} className="p-3 border border-blue-100">
+                        <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <p className="text-xs text-gray-500">Sr. No.</p>
-                            <p className="font-medium text-sm">
-                              {(page.current_page - 1) * page.per_page + index + 1}
-                            </p>
+                            <p className="text-xs text-blue-600">Sr. No.</p>
+                            <p className="font-medium text-sm truncate">{(page.current_page - 1) * page.per_page + index + 1}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500">Complaint ID</p>
-                            <p className="font-medium text-sm">{item.complaintId}</p>
+                            <p className="text-xs text-blue-600">Complaint ID</p>
+                            <p className="font-medium text-sm truncate">{item.complaintId}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500">Order ID</p>
-                            <p className="font-medium text-sm">{item.orderId}</p>
+                            <p className="text-xs text-blue-600">Order ID</p>
+                            <p className="font-medium text-sm truncate">{item.orderId}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500">Name</p>
-                            <p className="font-medium text-sm">{item.name}</p>
+                            <p className="text-xs text-blue-600">Name</p>
+                            <p className="font-medium text-sm truncate">{item.name}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-blue-600">Email</p>
+                            <p className="font-medium text-sm truncate">{item.email || "N/A"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-blue-600">Mobile</p>
+                            <p className="font-medium text-sm truncate">{item.mobileNumber || "N/A"}</p>
                           </div>
                           <div className="col-span-2">
-                            <p className="text-xs text-gray-500">Description</p>
-                            <p className="font-medium text-sm">{item.description}</p>
+                            <p className="text-xs text-blue-600">Description</p>
+                            <p className="font-medium text-sm truncate">{item.description}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500">Status</p>
-                            <p className="font-medium text-sm">{item.status}</p>
+                            <p className="text-xs text-blue-600">Status</p>
+                            <p className="font-medium text-sm truncate">{item.status}</p>
                           </div>
                         </div>
-                        <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+                        <div className="flex justify-end mt-3">
                           <Button
-                            size="sm"
                             variant="outline"
+                            size="sm"
+                            className="border-blue-300 text-blue-700 hover:bg-blue-50"
                             onClick={() => handleOpenStatusModal(item.complaintId, item.status)}
-                            className="h-8 px-2"
+                            aria-label={`Update status for complaint ${item.complaintId}`}
                           >
                             Update Status
                           </Button>
                         </div>
-                      </div>
+                      </Card>
                     ))}
                   </div>
                 ) : (
-                  <table className="min-w-full border-separate border-spacing-y-2">
-                    <thead className="w-full">
-                      <tr className="rounded-md w-full text-center py-4">
-                        <th className="px-2 text-sm py-3 font-medium text-black">Sr. No.</th>
-                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">Complaint ID</th>
-                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">Order ID</th>
-                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">Name</th>
-                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">Email</th>
-                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">Mobile</th>
-                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">Description</th>
-                        <th className="px-2 text-sm py-3 font-medium text-black tracking-wider">Status</th>
-                        <th className="px-2 text-sm py-3 text-center font-medium text-black tracking-wider">Action</th>
+                  <table className="min-w-full divide-y divide-blue-200">
+                    <thead className="bg-blue-50">
+                      <tr>
+                        <th className="px-3 py-2 text-sm font-medium text-blue-900 text-left">Sr. No.</th>
+                        <th className="px-3 py-2 text-sm font-medium text-blue-900 text-left">Complaint ID</th>
+                        <th className="px-3 py-2 text-sm font-medium text-blue-900 text-left">Order ID</th>
+                        <th className="px-3 py-2 text-sm font-medium text-blue-900 text-left">Name</th>
+                        <th className="px-3 py-2 text-sm font-medium text-blue-900 text-left">Email</th>
+                        <th className="px-3 py-2 text-sm font-medium text-blue-900 text-left">Mobile</th>
+                        <th className="px-3 py-2 text-sm font-medium text-blue-900 text-left">Description</th>
+                        <th className="px-3 py-2 text-sm font-medium text-blue-900 text-left">Status</th>
+                        <th className="px-3 py-2 text-sm font-medium text-blue-900 text-left">Action</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {listData.map((item: Complaint, index) => (
-                        <tr key={item.complaintId} className="text-center bg-white shadow-md text-sm">
-                          <td className="px-2 py-4 font-medium text-black rounded-tl-lg rounded-bl-lg">
-                            {(page.current_page - 1) * page.per_page + index + 1}
-                          </td>
-                          <td className="px-2 py-4 font-medium text-black">{item.complaintId}</td>
-                          <td className="px-2 py-4 font-medium text-black">{item.orderId}</td>
-                          <td className="px-2 py-4 font-medium text-black">{item.name}</td>
-                          <td className="px-2 py-4 font-medium text-black">{item.email || "N/A"}</td>
-                          <td className="px-2 py-4 font-medium text-black">{item.mobileNumber || "N/A"}</td>
-                          <td className="px-2 py-4 font-medium text-black">{item.description}</td>
-                          <td className="px-2 py-4 font-medium text-black">{item.status}</td>
-                          <td className="px-2 py-4 font-medium rounded-tr-lg rounded-br-lg">
+                    <tbody className="divide-y divide-blue-200">
+                      {listData.map((item, index) => (
+                        <tr key={item.complaintId} className="hover:bg-blue-50 transition-colors">
+                          <td className="px-3 py-3 text-sm">{(page.current_page - 1) * page.per_page + index + 1}</td>
+                          <td className="px-3 py-3 text-sm truncate max-w-[100px]">{item.complaintId}</td>
+                          <td className="px-3 py-3 text-sm truncate max-w-[100px]">{item.orderId}</td>
+                          <td className="px-3 py-3 text-sm truncate max-w-[150px]">{item.name}</td>
+                          <td className="px-3 py-3 text-sm truncate max-w-[200px]">{item.email || "N/A"}</td>
+                          <td className="px-3 py-3 text-sm truncate max-w-[150px]">{item.mobileNumber || "N/A"}</td>
+                          <td className="px-3 py-3 text-sm truncate max-w-[250px]">{item.description}</td>
+                          <td className="px-3 py-3 text-sm truncate">{item.status}</td>
+                          <td className="px-3 py-3">
                             <Button
-                              size="sm"
                               variant="outline"
+                              size="sm"
+                              className="border-blue-300 text-blue-700 hover:bg-blue-50"
                               onClick={() => handleOpenStatusModal(item.complaintId, item.status)}
-                              className="p-2"
+                              aria-label={`Update status for complaint ${item.complaintId}`}
                             >
                               Update Status
                             </Button>
@@ -336,7 +340,7 @@ const ComplaintsDashboard: FC = () => {
                     </tbody>
                   </table>
                 )}
-                <div className="w-full mt-6">
+                <div className="mt-4">
                   <Pagination
                     numOfPages={page.last_page}
                     pageNo={page.current_page}
@@ -349,44 +353,46 @@ const ComplaintsDashboard: FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center mt-12">
-                <h2 className="text-xl font-semibold mb-4">No Complaints Found</h2>
+              <div className="flex flex-col items-center justify-center py-10">
+                <h2 className="text-lg sm:text-xl font-semibold text-blue-600">No Complaints Found</h2>
+                <p className="text-sm text-blue-500 mt-2">Try adjusting your filters or adding new complaints.</p>
               </div>
             )}
-          </div>
-          <Modal open={open} onClose={handleClose}>
-            <Box sx={modalStyle}>
-              <IconButton
-                onClick={handleClose}
-                sx={{ position: "absolute", top: 8, right: 8, color: "grey.500" }}
-              >
-                <X />
-              </IconButton>
-              <Typography variant="h6" component="h2" mb={2} fontFamily={"Nunito"}>
-                Update Complaint Status
-              </Typography>
-              <Select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                fullWidth
-                sx={{ mb: 4 }}
-              >
-                <MenuItem value="PENDING">Pending</MenuItem>
-                <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                <MenuItem value="RESOLVED">Resolved</MenuItem>
-              </Select>
-              <Box display="flex" justifyContent="flex-end" gap={2}>
-                <Button onClick={handleUpdateStatus}>
-                  Update
-                </Button>
-                <Button className="bg-gray-600" onClick={handleClose}>
-                  Cancel
-                </Button>
-              </Box>
-            </Box>
-          </Modal>
-        </div>
+          </CardContent>
+        </Card>
       )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-sm p-4">
+          <DialogHeader>
+            <DialogTitle className="text-blue-800">Update Complaint Status</DialogTitle>
+          </DialogHeader>
+          <Select
+            options={statusOptions.filter((option) => option.value !== "")}
+            value={statusOptions.find((option) => option.value === selectedStatus)}
+            onChange={(option) => setSelectedStatus(option ? option.value : "")}
+            className="w-full text-sm"
+            classNamePrefix="select"
+            aria-label="Select complaint status"
+          />
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={handleClose}
+              className="border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateStatus}
+              disabled={!selectedStatus}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Update
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
