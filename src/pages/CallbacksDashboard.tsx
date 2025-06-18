@@ -1,6 +1,6 @@
 import { FC, useEffect, useState, useCallback, useRef } from "react";
 import api from "../utils/axios";
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

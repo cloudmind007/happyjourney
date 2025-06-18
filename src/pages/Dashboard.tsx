@@ -236,7 +236,7 @@ const Dashboard = () => {
   interface StatCardProps {
     title: string;
     value: string | number;
-    icon: React.ComponentType<{ size: number; className: string }>;
+    icon: React.ComponentType<{ size?: number | string; className?: string }>;
     color: string;
     textColor: string;
   }
