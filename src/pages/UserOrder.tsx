@@ -141,14 +141,15 @@ const UserOrder: React.FC = () => {
   // Debounced search function
   const debouncedSearch = useCallback(
     debounce((query: string, items: MenuItem[]) => {
-      if (!query) {
+      if (!query.trim()) {
         setFilteredItems(items);
         return;
       }
+      const lowerQuery = query.toLowerCase().trim();
       const filtered = items.filter(
-        item =>
-          item.itemName.toLowerCase().includes(query.toLowerCase()) ||
-          item.description.toLowerCase().includes(query.toLowerCase())
+        (item) =>
+          (item.itemName && item.itemName.toLowerCase().includes(lowerQuery)) ||
+          (item.description && item.description.toLowerCase().includes(lowerQuery))
       );
       setFilteredItems(filtered);
     }, 300),
@@ -169,10 +170,10 @@ const UserOrder: React.FC = () => {
         itemName: menuItems.find((menuItem) => menuItem.itemId === item.itemId)?.itemName || "Unknown Item",
       }));
       setCartSummary({ ...summary, items: enrichedItems });
-      
+
       // Initialize quantities state based on cart items
       const newQuantities = { ...quantities };
-      enrichedItems.forEach(item => {
+      enrichedItems.forEach((item) => {
         newQuantities[item.itemId] = item.quantity;
       });
       setQuantities(newQuantities);
@@ -195,7 +196,7 @@ const UserOrder: React.FC = () => {
       };
       await api.post(`/cart/add-item`, request);
       await fetchCartSummary();
-      setQuantities(prev => ({ ...prev, [itemId]: 0 }));
+      setQuantities((prev) => ({ ...prev, [itemId]: 0 }));
     } catch (error: any) {
       console.error("Error adding item to cart:", error);
       setError(error.response?.data?.message || "Failed to add item to cart");
@@ -228,7 +229,7 @@ const UserOrder: React.FC = () => {
     try {
       await api.delete(`/cart/items/${itemId}`, { params: { vendorId: effectiveVendorId } });
       await fetchCartSummary();
-      setQuantities(prev => ({ ...prev, [itemId]: 0 }));
+      setQuantities((prev) => ({ ...prev, [itemId]: 0 }));
     } catch (error: any) {
       console.error("Error removing item from cart:", error);
       setError(error.response?.data?.message || "Failed to remove item from cart");
@@ -244,7 +245,7 @@ const UserOrder: React.FC = () => {
       // Reset quantities for all items in cart
       if (cartSummary) {
         const resetQuantities = { ...quantities };
-        cartSummary.items.forEach(item => {
+        cartSummary.items.forEach((item) => {
           resetQuantities[item.itemId] = 0;
         });
         setQuantities(resetQuantities);
@@ -258,7 +259,7 @@ const UserOrder: React.FC = () => {
   const handleQuantityChange = (itemId: number, value: string) => {
     const numValue = parseInt(value) || 0;
     if (numValue >= 0) {
-      setQuantities(prev => ({ ...prev, [itemId]: numValue }));
+      setQuantities((prev) => ({ ...prev, [itemId]: numValue }));
     }
   };
 
@@ -278,13 +279,11 @@ const UserOrder: React.FC = () => {
   const renderSkeletonLoader = () => (
     <div className="max-w-7xl mx-auto p-4 space-y-8">
       <div className="relative rounded-2xl overflow-hidden shadow-xl mb-8 h-64 bg-gray-200 animate-pulse"></div>
-      
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <Skeleton className="h-8 w-48 rounded-lg" />
           <Skeleton className="h-10 w-64 rounded-lg" />
         </div>
-        
         {[...Array(3)].map((_, i) => (
           <div key={i} className="space-y-4">
             <Skeleton className="h-6 w-56 rounded-lg" />
@@ -317,7 +316,7 @@ const UserOrder: React.FC = () => {
         <div className="text-red-600 text-lg font-medium">
           {error || "Failed to load restaurant details. Please try again later."}
         </div>
-        <Button 
+        <Button
           className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
           onClick={() => window.location.reload()}
         >
@@ -384,7 +383,7 @@ const UserOrder: React.FC = () => {
             <Utensils className="w-6 h-6 mr-2 text-amber-500" />
             Menu
           </h2>
-          
+
           {searchQuery && (
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -393,7 +392,10 @@ const UserOrder: React.FC = () => {
               {filteredItems.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredItems.map((item) => (
-                    <div key={item.itemId} className="flex flex-col p-4 bg-white rounded-lg border border-gray-200 hover:border-amber-300 transition-colors shadow-sm hover:shadow-md">
+                    <div
+                      key={item.itemId}
+                      className="flex flex-col p-4 bg-white rounded-lg border border-gray-200 hover:border-amber-300 transition-colors shadow-sm hover:shadow-md"
+                    >
                       <div className="flex-1">
                         <div className="flex justify-between items-start">
                           <h4 className="text-md font-medium text-gray-800">{item.itemName}</h4>
@@ -458,15 +460,16 @@ const UserOrder: React.FC = () => {
             sortedCategories.map((category) => {
               const categoryItems = filteredItems.filter((item) => item.categoryId === category.categoryId);
               if (categoryItems.length === 0) return null;
-              
+
               return (
                 <div key={category.categoryId} className="space-y-4">
-                  <h3 className="text-xl font-semibold text-gray-800 border-b pb-2">
-                    {category.categoryName}
-                  </h3>
+                  <h3 className="text-xl font-semibold text-gray-800 border-b pb-2">{category.categoryName}</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {categoryItems.map((item) => (
-                      <div key={item.itemId} className="flex flex-col p-4 bg-white rounded-lg border border-gray-200 hover:border-amber-300 transition-colors shadow-sm hover:shadow-md">
+                      <div
+                        key={item.itemId}
+                        className="flex flex-col p-4 bg-white rounded-lg border border-gray-200 hover:border-amber-300 transition-colors shadow-sm hover:shadow-md"
+                      >
                         <div className="flex-1">
                           <div className="flex justify-between items-start">
                             <h4 className="text-md font-medium text-gray-800">{item.itemName}</h4>
@@ -522,11 +525,13 @@ const UserOrder: React.FC = () => {
                 </div>
               );
             })
-          ) : !searchQuery && (
-            <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md border border-dashed border-gray-300">
-              <h3 className="text-lg font-medium text-gray-700">No Categories Found</h3>
-              <p className="text-gray-600 mt-1">No categories available for this restaurant.</p>
-            </div>
+          ) : (
+            !searchQuery && (
+              <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md border border-dashed border-gray-300">
+                <h3 className="text-lg font-medium text-gray-700">No Categories Found</h3>
+                <p className="text-gray-600 mt-1">No categories available for this restaurant.</p>
+              </div>
+            )
           )}
         </div>
       </div>
@@ -655,7 +660,12 @@ const UserOrder: React.FC = () => {
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -750,15 +760,15 @@ const UserOrder: React.FC = () => {
           </DialogHeader>
           <p className="text-gray-600">Are you sure you want to clear all items from your cart?</p>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
               onClick={() => setIsClearCartOpen(false)}
             >
               Cancel
             </Button>
-            <Button 
-              onClick={clearCart} 
+            <Button
+              onClick={clearCart}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Clear Cart
