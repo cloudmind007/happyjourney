@@ -24,7 +24,7 @@ interface Callback {
 
 const statusOptions = [
   { value: "", label: "All Statuses" },
-  { value: "PENDING", label: "Pending" },
+  { value: "OPEN", label: "open" },
   { value: "IN_PROGRESS", label: "In Progress" },
   { value: "COMPLETED", label: "Completed" },
 ];
