@@ -43,11 +43,11 @@ export const vendorMenuItems: MenuItem[] = [
 
 export const userMenuItems: MenuItem[] = [
   { icon: Home, label: "Home", path: "/home" },
-  { icon: ShoppingCart, label: "My Orders", path: "/orders" },
-  { icon: Wallet, label: "Wallet", path: "/wallet" },
+  // { icon: ShoppingCart, label: "My Orders", path: "/orders" },
+  // { icon: Wallet, label: "Wallet", path: "/wallet" },
   { icon: History, label: "Order History", path: "/order-history" },
   { icon: AlertCircle, label: "Complaint", path: "/createcomplaint" },  
-  { icon: MessageSquare, label: "Feedback", path: "/feedback" },
+  // { icon: MessageSquare, label: "Feedback", path: "/feedback" },
   { icon: Shield, label: "Privacy Policy", path: "/privacy-policy" },
   { icon: XCircle, label: "Cancellation Policy", path: "/cancellation-policy" },
   { icon: FileText, label: "Terms & Conditions", path: "/terms" },
