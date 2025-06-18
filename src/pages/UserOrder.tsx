@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronUp, Star, Clock, Leaf, Utensils, Trash2, Plus, Minus, ShoppingCart } from "lucide-react";
+import { Star, Clock, Leaf, Utensils, Trash2, Plus, Minus, ShoppingCart, Search } from "lucide-react";
+import { debounce } from "lodash";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/utils/axios";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -23,8 +26,6 @@ interface Category {
   vendorId: number;
   displayOrder: number;
 }
-
-
 
 interface MenuItem {
   itemId: number;
@@ -63,14 +64,15 @@ const UserOrder: React.FC = () => {
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [cartSummary, setCartSummary] = useState<CartSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
   const [isClearCartOpen, setIsClearCartOpen] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState<number | null>(null);
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({});
   const [isCartExpanded, setIsCartExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const cartRef = useRef<HTMLDivElement>(null);
 
   // Validate vendorId
@@ -99,40 +101,64 @@ const UserOrder: React.FC = () => {
     }
   }, [isCustomer, userId, navigate]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        // Fetch vendor details
-        const vendorRes = await api.get(`/vendors/${effectiveVendorId}`);
-        setVendor(vendorRes.data);
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Fetch vendor details
+      const vendorRes = await api.get(`/vendors/${effectiveVendorId}`);
+      setVendor(vendorRes.data);
 
-        // Fetch categories
-        const categoriesRes = await api.get(`/menu/vendors/${effectiveVendorId}/categories`);
-        const fetchedCategories = categoriesRes.data.content || [];
-        setCategories(fetchedCategories);
+      // Fetch categories
+      const categoriesRes = await api.get(`/menu/vendors/${effectiveVendorId}/categories`);
+      const fetchedCategories = categoriesRes.data.content || [];
+      setCategories(fetchedCategories);
 
-        // Fetch menu items
-        const menuItemsRes = await api.get(`/menu/vendors/${effectiveVendorId}/items`);
-        const itemsWithCategory = menuItemsRes.data.map((item: MenuItem) => ({
-          ...item,
-          categoryName:
-            fetchedCategories.find((cat: Category) => cat.categoryId === item.categoryId)?.categoryName ||
-            "Uncategorized",
-        }));
-        setMenuItems(itemsWithCategory);
+      // Fetch menu items
+      const menuItemsRes = await api.get(`/menu/vendors/${effectiveVendorId}/items`);
+      const itemsWithCategory = menuItemsRes.data.map((item: MenuItem) => ({
+        ...item,
+        categoryName:
+          fetchedCategories.find((cat: Category) => cat.categoryId === item.categoryId)?.categoryName ||
+          "Uncategorized",
+      }));
+      setMenuItems(itemsWithCategory);
+      setFilteredItems(itemsWithCategory);
 
-        await fetchCartSummary();
-      } catch (error: any) {
-        console.error("Error fetching data:", error);
-        setError(error.response?.data?.message || "Failed to load restaurant details. Please try again later.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
+      await fetchCartSummary();
+    } catch (error: any) {
+      console.error("Error fetching data:", error);
+      setError(error.response?.data?.message || "Failed to load restaurant details. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
   }, [effectiveVendorId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce((query: string, items: MenuItem[]) => {
+      if (!query) {
+        setFilteredItems(items);
+        return;
+      }
+      const filtered = items.filter(
+        item =>
+          item.itemName.toLowerCase().includes(query.toLowerCase()) ||
+          item.description.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredItems(filtered);
+    }, 300),
+    []
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchQuery, menuItems);
+    return () => debouncedSearch.cancel();
+  }, [searchQuery, menuItems, debouncedSearch]);
 
   const fetchCartSummary = async () => {
     try {
@@ -143,6 +169,13 @@ const UserOrder: React.FC = () => {
         itemName: menuItems.find((menuItem) => menuItem.itemId === item.itemId)?.itemName || "Unknown Item",
       }));
       setCartSummary({ ...summary, items: enrichedItems });
+      
+      // Initialize quantities state based on cart items
+      const newQuantities = { ...quantities };
+      enrichedItems.forEach(item => {
+        newQuantities[item.itemId] = item.quantity;
+      });
+      setQuantities(newQuantities);
     } catch (error: any) {
       console.error("Error fetching cart summary:", error);
       setCartSummary(null);
@@ -162,7 +195,7 @@ const UserOrder: React.FC = () => {
       };
       await api.post(`/cart/add-item`, request);
       await fetchCartSummary();
-      setQuantities((prev) => ({ ...prev, [itemId]: 0 }));
+      setQuantities(prev => ({ ...prev, [itemId]: 0 }));
     } catch (error: any) {
       console.error("Error adding item to cart:", error);
       setError(error.response?.data?.message || "Failed to add item to cart");
@@ -172,10 +205,6 @@ const UserOrder: React.FC = () => {
   };
 
   const updateCartItemQuantity = async (itemId: number, newQuantity: number) => {
-    if (newQuantity < 1) {
-      await removeItemFromCart(itemId);
-      return;
-    }
     setIsAddingItem(itemId);
     try {
       const request = {
@@ -199,6 +228,7 @@ const UserOrder: React.FC = () => {
     try {
       await api.delete(`/cart/items/${itemId}`, { params: { vendorId: effectiveVendorId } });
       await fetchCartSummary();
+      setQuantities(prev => ({ ...prev, [itemId]: 0 }));
     } catch (error: any) {
       console.error("Error removing item from cart:", error);
       setError(error.response?.data?.message || "Failed to remove item from cart");
@@ -211,20 +241,24 @@ const UserOrder: React.FC = () => {
       setCartSummary(null);
       setIsClearCartOpen(false);
       setIsCartExpanded(false);
+      // Reset quantities for all items in cart
+      if (cartSummary) {
+        const resetQuantities = { ...quantities };
+        cartSummary.items.forEach(item => {
+          resetQuantities[item.itemId] = 0;
+        });
+        setQuantities(resetQuantities);
+      }
     } catch (error: any) {
       console.error("Error clearing cart:", error);
       setError(error.response?.data?.message || "Failed to clear cart");
     }
   };
 
-  const toggleCategory = (categoryId: number) => {
-    setExpandedCategory(expandedCategory === categoryId ? null : categoryId);
-  };
-
   const handleQuantityChange = (itemId: number, value: string) => {
     const numValue = parseInt(value) || 0;
     if (numValue >= 0) {
-      setQuantities((prev) => ({ ...prev, [itemId]: numValue }));
+      setQuantities(prev => ({ ...prev, [itemId]: numValue }));
     }
   };
 
@@ -241,14 +275,40 @@ const UserOrder: React.FC = () => {
 
   const sortedCategories = [...categories].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
-  if (isLoading) {
-    return (
-      <div className="max-w-7xl mx-auto p-4">
-        <div className="flex justify-center items-center h-64">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+  const renderSkeletonLoader = () => (
+    <div className="max-w-7xl mx-auto p-4 space-y-8">
+      <div className="relative rounded-2xl overflow-hidden shadow-xl mb-8 h-64 bg-gray-200 animate-pulse"></div>
+      
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-8 w-48 rounded-lg" />
+          <Skeleton className="h-10 w-64 rounded-lg" />
         </div>
+        
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="space-y-4">
+            <Skeleton className="h-6 w-56 rounded-lg" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(3)].map((_, j) => (
+                <div key={j} className="p-4 bg-gray-50 rounded-lg space-y-3">
+                  <Skeleton className="h-5 w-3/4 rounded" />
+                  <Skeleton className="h-4 w-full rounded" />
+                  <Skeleton className="h-4 w-1/2 rounded" />
+                  <div className="flex justify-between items-center pt-2">
+                    <Skeleton className="h-8 w-24 rounded" />
+                    <Skeleton className="h-10 w-28 rounded-lg" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
-    );
+    </div>
+  );
+
+  if (isLoading) {
+    return renderSkeletonLoader();
   }
 
   if (error || !vendor) {
@@ -257,6 +317,12 @@ const UserOrder: React.FC = () => {
         <div className="text-red-600 text-lg font-medium">
           {error || "Failed to load restaurant details. Please try again later."}
         </div>
+        <Button 
+          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </Button>
       </div>
     );
   }
@@ -296,6 +362,20 @@ const UserOrder: React.FC = () => {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative mb-8">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search className="h-5 w-5 text-gray-400" />
+        </div>
+        <Input
+          type="text"
+          placeholder="Search menu items..."
+          className="pl-10 pr-4 py-6 text-base border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
       {/* Main Content */}
       <div className="relative flex flex-col lg:flex-row gap-8">
         {/* Menu Section */}
@@ -304,103 +384,145 @@ const UserOrder: React.FC = () => {
             <Utensils className="w-6 h-6 mr-2 text-amber-500" />
             Menu
           </h2>
-          {sortedCategories.length > 0 ? (
+          
+          {searchQuery && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                Search Results for "{searchQuery}"
+              </h3>
+              {filteredItems.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredItems.map((item) => (
+                    <div key={item.itemId} className="flex flex-col p-4 bg-white rounded-lg border border-gray-200 hover:border-amber-300 transition-colors shadow-sm hover:shadow-md">
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <h4 className="text-md font-medium text-gray-800">{item.itemName}</h4>
+                          <span className="text-sm font-medium text-gray-800">₹{item.basePrice}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 line-clamp-2 mt-1">{item.description}</p>
+                        {item.vegetarian && (
+                          <span className="inline-flex items-center mt-2 text-green-600 text-xs">
+                            <Leaf className="w-3 h-3 mr-1" /> Vegetarian
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-4">
+                        <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                          <button
+                            className="p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                            onClick={() => handleQuantityChange(item.itemId, String((quantities[item.itemId] || 0) - 1))}
+                            disabled={(quantities[item.itemId] || 0) <= 0}
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <input
+                            type="number"
+                            value={quantities[item.itemId] || 0}
+                            onChange={(e) => handleQuantityChange(item.itemId, e.target.value)}
+                            className="w-12 text-center border-x border-gray-300 focus:outline-none text-sm"
+                            min="0"
+                          />
+                          <button
+                            className="p-2 text-gray-600 hover:bg-gray-100"
+                            onClick={() => handleQuantityChange(item.itemId, String((quantities[item.itemId] || 0) + 1))}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <Button
+                          onClick={() => addItemToCart(item.itemId, quantities[item.itemId] || 1)}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2"
+                          disabled={isAddingItem === item.itemId || !item.available || (quantities[item.itemId] || 0) <= 0}
+                        >
+                          {isAddingItem === item.itemId ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <span className="flex items-center justify-center">
+                              <Plus className="w-4 h-4 mr-1" /> Add
+                            </span>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-gray-50 rounded-lg">
+                  <p className="text-gray-600">No items found matching your search.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!searchQuery && sortedCategories.length > 0 ? (
             sortedCategories.map((category) => {
-              const categoryItems = menuItems.filter((item) => item.categoryId === category.categoryId);
+              const categoryItems = filteredItems.filter((item) => item.categoryId === category.categoryId);
+              if (categoryItems.length === 0) return null;
+              
               return (
-                <div
-                  key={category.categoryId}
-                  className="bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow"
-                >
-                  <div
-                    className="flex justify-between items-center p-4 sm:p-6 cursor-pointer"
-                    onClick={() => toggleCategory(category.categoryId)}
-                  >
-                    <h3 className="text-lg sm:text-xl font-semibold text-gray-800">{category.categoryName}</h3>
-                    <div>
-                      {expandedCategory === category.categoryId ? (
-                        <ChevronUp className="w-5 h-5 text-gray-500" />
-                      ) : (
-                        <ChevronDown className="w-5 h-5 text-gray-500" />
-                      )}
-                    </div>
-                  </div>
-                  {expandedCategory === category.categoryId && (
-                    <div className="p-4 sm:p-6 border-t border-gray-100">
-                      {categoryItems.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {categoryItems.map((item) => (
-                            <div
-                              key={item.itemId}
-                              className="flex flex-col p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-amber-300 transition-colors"
+                <div key={category.categoryId} className="space-y-4">
+                  <h3 className="text-xl font-semibold text-gray-800 border-b pb-2">
+                    {category.categoryName}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {categoryItems.map((item) => (
+                      <div key={item.itemId} className="flex flex-col p-4 bg-white rounded-lg border border-gray-200 hover:border-amber-300 transition-colors shadow-sm hover:shadow-md">
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <h4 className="text-md font-medium text-gray-800">{item.itemName}</h4>
+                            <span className="text-sm font-medium text-gray-800">₹{item.basePrice}</span>
+                          </div>
+                          <p className="text-sm text-gray-600 line-clamp-2 mt-1">{item.description}</p>
+                          {item.vegetarian && (
+                            <span className="inline-flex items-center mt-2 text-green-600 text-xs">
+                              <Leaf className="w-3 h-3 mr-1" /> Vegetarian
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-4">
+                          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                            <button
+                              className="p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                              onClick={() => handleQuantityChange(item.itemId, String((quantities[item.itemId] || 0) - 1))}
+                              disabled={(quantities[item.itemId] || 0) <= 0}
                             >
-                              <div className="flex-1">
-                                <h4 className="text-md font-medium text-gray-800">{item.itemName}</h4>
-                                <p className="text-sm text-gray-600 line-clamp-2">{item.description}</p>
-                                <div className="flex items-center mt-2 gap-2">
-                                  <span className="text-sm font-medium">₹{item.basePrice}</span>
-                                  {item.vegetarian && (
-                                    <span className="text-green-600 flex items-center text-sm">
-                                      <Leaf className="w-3 h-3 mr-1" /> Veg
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 mt-3">
-                                <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-                                  <button
-                                    className="p-2 text-gray-600 hover:bg-gray-100"
-                                    onClick={() =>
-                                      handleQuantityChange(item.itemId, String((quantities[item.itemId] || 0) - 1))
-                                    }
-                                    disabled={(quantities[item.itemId] || 0) <= 0}
-                                  >
-                                    <Minus className="w-4 h-4" />
-                                  </button>
-                                  <input
-                                    type="number"
-                                    value={quantities[item.itemId] || 0}
-                                    onChange={(e) => handleQuantityChange(item.itemId, e.target.value)}
-                                    className="w-12 text-center border-x border-gray-300 focus:outline-none"
-                                    min="0"
-                                  />
-                                  <button
-                                    className="p-2 text-gray-600 hover:bg-gray-100"
-                                    onClick={() =>
-                                      handleQuantityChange(item.itemId, String((quantities[item.itemId] || 0) + 1))
-                                    }
-                                  >
-                                    <Plus className="w-4 h-4" />
-                                  </button>
-                                </div>
-                                <Button
-                                  onClick={() => addItemToCart(item.itemId, quantities[item.itemId] || 1)}
-                                  className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm"
-                                  disabled={isAddingItem === item.itemId || !item.available || (quantities[item.itemId] || 0) <= 0}
-                                >
-                                  {isAddingItem === item.itemId ? (
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                  ) : (
-                                    <span className="flex items-center justify-center">
-                                      <Plus className="w-4 h-4 mr-1" /> Add
-                                    </span>
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <input
+                              type="number"
+                              value={quantities[item.itemId] || 0}
+                              onChange={(e) => handleQuantityChange(item.itemId, e.target.value)}
+                              className="w-12 text-center border-x border-gray-300 focus:outline-none text-sm"
+                              min="0"
+                            />
+                            <button
+                              className="p-2 text-gray-600 hover:bg-gray-100"
+                              onClick={() => handleQuantityChange(item.itemId, String((quantities[item.itemId] || 0) + 1))}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <Button
+                            onClick={() => addItemToCart(item.itemId, quantities[item.itemId] || 1)}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2"
+                            disabled={isAddingItem === item.itemId || !item.available || (quantities[item.itemId] || 0) <= 0}
+                          >
+                            {isAddingItem === item.itemId ? (
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <span className="flex items-center justify-center">
+                                <Plus className="w-4 h-4 mr-1" /> Add
+                              </span>
+                            )}
+                          </Button>
                         </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                          <p className="text-gray-600">No menu items found in this category</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               );
             })
-          ) : (
+          ) : !searchQuery && (
             <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md border border-dashed border-gray-300">
               <h3 className="text-lg font-medium text-gray-700">No Categories Found</h3>
               <p className="text-gray-600 mt-1">No categories available for this restaurant.</p>
@@ -415,7 +537,7 @@ const UserOrder: React.FC = () => {
           {/* Floating Cart Button - Mobile */}
           <div className="fixed bottom-4 right-4 lg:hidden z-50">
             <Button
-              className="bg-blue-600 hover:bg-blue-700 h-14 w-14 rounded-full shadow-lg relative"
+              className="bg-blue-600 hover:bg-blue-700 h-14 w-14 rounded-full shadow-lg relative transition-transform hover:scale-105"
               onClick={() => setIsCartExpanded(true)}
             >
               <ShoppingCart className="w-6 h-6 text-white" />
@@ -439,31 +561,30 @@ const UserOrder: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <div className="flex items-center border border-gray-300 rounded-lg">
                         <button
-                          className="p-2 text-gray-600 hover:bg-gray-100"
+                          className="p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
                           onClick={() => updateCartItemQuantity(item.itemId, item.quantity - 1)}
                           disabled={isAddingItem === item.itemId}
-                          aria-label={`Decrease quantity of ${item.itemName}`}
                         >
                           <Minus className="w-4 h-4" />
                         </button>
                         <span className="w-12 text-center text-sm">{item.quantity}</span>
                         <button
-                          className="p-2 text-gray-600 hover:bg-gray-100"
+                          className="p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
                           onClick={() => updateCartItemQuantity(item.itemId, item.quantity + 1)}
                           disabled={isAddingItem === item.itemId}
-                          aria-label={`Increase quantity of ${item.itemName}`}
                         >
                           <Plus className="w-4 h-4" />
                         </button>
                       </div>
-                      <p className="text-sm font-medium text-gray-800">₹{(item.unitPrice * item.quantity).toFixed(2)}</p>
+                      <p className="text-sm font-medium text-gray-800 min-w-[60px] text-right">
+                        ₹{(item.unitPrice * item.quantity).toFixed(2)}
+                      </p>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-red-600 hover:bg-red-50 p-2"
                         onClick={() => removeItemFromCart(item.itemId)}
                         disabled={isAddingItem === item.itemId}
-                        aria-label={`Remove ${item.itemName} from cart`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -492,7 +613,7 @@ const UserOrder: React.FC = () => {
               <div className="flex gap-3 mt-6">
                 <Button
                   variant="outline"
-                  className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                   onClick={() => setIsClearCartOpen(true)}
                 >
                   Clear
@@ -526,7 +647,6 @@ const UserOrder: React.FC = () => {
                   <button
                     onClick={() => setIsCartExpanded(false)}
                     className="text-gray-500 hover:text-gray-700"
-                    aria-label="Close cart"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -549,31 +669,30 @@ const UserOrder: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <div className="flex items-center border border-gray-300 rounded-lg">
                           <button
-                            className="p-2 text-gray-600 hover:bg-gray-100"
+                            className="p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
                             onClick={() => updateCartItemQuantity(item.itemId, item.quantity - 1)}
                             disabled={isAddingItem === item.itemId}
-                            aria-label={`Decrease quantity of ${item.itemName}`}
                           >
                             <Minus className="w-4 h-4" />
                           </button>
                           <span className="w-12 text-center text-sm">{item.quantity}</span>
                           <button
-                            className="p-2 text-gray-600 hover:bg-gray-100"
+                            className="p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
                             onClick={() => updateCartItemQuantity(item.itemId, item.quantity + 1)}
                             disabled={isAddingItem === item.itemId}
-                            aria-label={`Increase quantity of ${item.itemName}`}
                           >
                             <Plus className="w-4 h-4" />
                           </button>
                         </div>
-                        <p className="text-sm font-medium text-gray-800">₹{(item.unitPrice * item.quantity).toFixed(2)}</p>
+                        <p className="text-sm font-medium text-gray-800 min-w-[60px] text-right">
+                          ₹{(item.unitPrice * item.quantity).toFixed(2)}
+                        </p>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="text-red-600 hover:bg-red-50 p-2"
                           onClick={() => removeItemFromCart(item.itemId)}
                           disabled={isAddingItem === item.itemId}
-                          aria-label={`Remove ${item.itemName} from cart`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -602,7 +721,7 @@ const UserOrder: React.FC = () => {
                 <div className="flex gap-3 mt-6">
                   <Button
                     variant="outline"
-                    className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                    className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                     onClick={() => setIsClearCartOpen(true)}
                   >
                     Clear
@@ -625,16 +744,23 @@ const UserOrder: React.FC = () => {
 
       {/* Clear Cart Confirmation */}
       <Dialog open={isClearCartOpen} onOpenChange={setIsClearCartOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Clear Cart</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Clear Cart</DialogTitle>
           </DialogHeader>
           <p className="text-gray-600">Are you sure you want to clear all items from your cart?</p>
           <DialogFooter>
-            <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50" onClick={() => setIsClearCartOpen(false)}>
+            <Button 
+              variant="outline" 
+              className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+              onClick={() => setIsClearCartOpen(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={clearCart} className="bg-red-600 hover:bg-red-700 text-white">
+            <Button 
+              onClick={clearCart} 
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
               Clear Cart
             </Button>
           </DialogFooter>
