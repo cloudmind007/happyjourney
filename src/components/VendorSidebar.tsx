@@ -1,15 +1,15 @@
-import React, { useEffect } from "react";
+import React, { useEffect, forwardRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { vendorMenuItems } from "../constants/menuItems";
-import { Menu } from "lucide-react";
 
 type VendorSidebarProps = {
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-  vendorId?: number;
+  vendorId?: string;
+  className?: string;
 };
 
-const VendorSidebar: React.FC<VendorSidebarProps> = ({ collapsed, setCollapsed, vendorId }) => {
+const VendorSidebar = forwardRef<HTMLDivElement, VendorSidebarProps>(({ collapsed, setCollapsed, vendorId, className }, ref) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -29,21 +29,17 @@ const VendorSidebar: React.FC<VendorSidebarProps> = ({ collapsed, setCollapsed, 
 
   return (
     <div
-      className={`h-full ${collapsed ? "w-20" : "w-64"} bg-white shadow-sm border-r transition-all duration-300`}
+      ref={ref}
+      className={`h-full ${
+        collapsed ? "w-0 md:w-20" : "w-64"
+      } bg-white shadow-sm border-r transition-all duration-300 overflow-hidden md:overflow-visible fixed md:static z-10 ${className || ""}`}
     >
-      <div className="flex items-center justify-between p-4">
-        {!collapsed && <h1 className="text-xl font-bold text-gray-800">Vendor Portal</h1>}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded hover:bg-gray-100 transition"
-        >
-          <Menu size={20} />
-        </button>
+      <div className={`flex items-center p-4 ${collapsed ? "hidden md:flex" : "flex"}`}>
+        {!collapsed && <h1 className="text-xl font-bold text-gray-800">VENDOR</h1>}
       </div>
-      <nav className="mt-4">
+      <nav className={`mt-4 ${collapsed ? "hidden md:block" : "block"}`}>
         {vendorMenuItems.map((item, index) => {
-          const path = item.path === "/vender-detail" && vendorId ? `/vender-detail/${vendorId}` : item.path;
-          const isActive = location.pathname === path;
+          const isActive = location.pathname === item.path;
           return (
             <div key={index} className="px-2 py-1">
               <div
@@ -55,7 +51,7 @@ const VendorSidebar: React.FC<VendorSidebarProps> = ({ collapsed, setCollapsed, 
                     ? "bg-blue-50 text-blue-600 border-l-4 border-blue-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                onClick={() => navigate(path)}
+                onClick={() => navigate(item.path)}
               >
                 <div className={`flex items-center ${collapsed ? "" : "space-x-3"}`}>
                   <item.icon size={20} />
@@ -68,6 +64,6 @@ const VendorSidebar: React.FC<VendorSidebarProps> = ({ collapsed, setCollapsed, 
       </nav>
     </div>
   );
-};
+});
 
 export default VendorSidebar;

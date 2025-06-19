@@ -1,14 +1,14 @@
-import React, { useEffect } from "react";
+import React, { useEffect, forwardRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { userMenuItems } from "../constants/menuItems";
-import { Menu } from "lucide-react";
 
 type UserSidebarProps = {
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+  className?: string;
 };
 
-const UserSidebar: React.FC<UserSidebarProps> = ({ collapsed, setCollapsed }) => {
+const UserSidebar = forwardRef<HTMLDivElement, UserSidebarProps>(({ collapsed, setCollapsed, className }, ref) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -28,18 +28,15 @@ const UserSidebar: React.FC<UserSidebarProps> = ({ collapsed, setCollapsed }) =>
 
   return (
     <div
-      className={`h-full ${collapsed ? "w-20" : "w-64"} bg-white shadow-sm border-r transition-all duration-300`}
+      ref={ref}
+      className={`h-full ${
+        collapsed ? "w-0 md:w-20" : "w-64"
+      } bg-white shadow-sm border-r transition-all duration-300 overflow-hidden md:overflow-visible fixed md:static z-10 ${className || ""}`}
     >
-      <div className="flex items-center justify-between p-4">
+      <div className={`flex items-center p-4 ${collapsed ? "hidden md:flex" : "flex"}`}>
         {!collapsed && <h1 className="text-xl font-bold text-gray-800">RelSwad</h1>}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded hover:bg-gray-100 transition"
-        >
-          <Menu size={20} />
-        </button>
       </div>
-      <nav className="mt-4">
+      <nav className={`mt-4 ${collapsed ? "hidden md:block" : "block"}`}>
         {userMenuItems.map((item, index) => {
           const isActive = location.pathname === item.path;
           return (
@@ -66,6 +63,6 @@ const UserSidebar: React.FC<UserSidebarProps> = ({ collapsed, setCollapsed }) =>
       </nav>
     </div>
   );
-};
+});
 
 export default UserSidebar;

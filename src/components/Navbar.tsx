@@ -1,22 +1,19 @@
-import { ChevronDown } from "lucide-react";
-import {  useNavigate } from "react-router-dom";
-// import { adminMenuItems, vendorMenuItems, userMenuItems } from "../constants/menuItems";
+import { ChevronDown, Menu } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import api from "../utils/axios";
 import { useAuth } from "../contexts/AuthContext";
 
-const Navbar = () => {
+type NavbarProps = {
+  collapsed?: boolean;
+  setCollapsed?: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
+const Navbar: React.FC<NavbarProps> = ({ collapsed, setCollapsed }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const {  username, logout } = useAuth();
-
-  // const menuItems = role?.toLowerCase() === "vendor"
-  //   ? vendorMenuItems
-  //   : role?.toLowerCase() === "user"
-  //   ? userMenuItems
-  //   : adminMenuItems;
-
+  const { username, logout } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -31,7 +28,7 @@ const Navbar = () => {
       console.error("Logout failed", error);
       logout();
       navigate("/login");
-    } 
+    }
   };
 
   useEffect(() => {
@@ -41,15 +38,22 @@ const Navbar = () => {
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 relative z-20">
       <div className="flex items-center justify-between">
-        <div className="flex items-center">
+        <div className="flex items-center space-x-4">
+          {setCollapsed && (
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="p-2 rounded hover:bg-gray-100 transition"
+            >
+              <Menu size={20} />
+            </button>
+          )}
           <div>
-            {/* <h1 className="text-2xl font-semibold text-gray-900">{title}</h1> */}
             <div className="flex items-center text-sm text-gray-500 mt-1">
               <span className="mx-2"></span>
             </div>
