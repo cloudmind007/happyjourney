@@ -47,7 +47,7 @@ interface OrderDTO {
   taxPercentage: number;
   discountAmount: number | null;
   finalAmount: number;
-  paymentStatus: "PAID" | "PENDING" | "FAILED";
+  paymentStatus: "COMPLETED" | "PENDING" | "FAILED";
   paymentMethod: "COD" | "UPI" | "CARD" | "NETBANKING";
   razorpayOrderID: string | null;
   deliveryInstructions: string | null;
