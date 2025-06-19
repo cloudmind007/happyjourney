@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { adminMenuItems, vendorMenuItems, userMenuItems } from "../constants/menuItems";
+import {  useNavigate } from "react-router-dom";
+// import { adminMenuItems, vendorMenuItems, userMenuItems } from "../constants/menuItems";
 import { useEffect, useRef, useState } from "react";
 import api from "../utils/axios";
 import { useAuth } from "../contexts/AuthContext";
@@ -8,15 +8,14 @@ import { useAuth } from "../contexts/AuthContext";
 const Navbar = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const location = useLocation();
   const navigate = useNavigate();
-  const { role, username, logout } = useAuth();
+  const {  username, logout } = useAuth();
 
-  const menuItems = role?.toLowerCase() === "vendor"
-    ? vendorMenuItems
-    : role?.toLowerCase() === "user"
-    ? userMenuItems
-    : adminMenuItems;
+  // const menuItems = role?.toLowerCase() === "vendor"
+  //   ? vendorMenuItems
+  //   : role?.toLowerCase() === "user"
+  //   ? userMenuItems
+  //   : adminMenuItems;
 
 
   const handleLogout = async () => {
