@@ -5,11 +5,10 @@ import { vendorMenuItems } from "../constants/menuItems";
 type VendorSidebarProps = {
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-  vendorId?: string;
   className?: string;
 };
 
-const VendorSidebar = forwardRef<HTMLDivElement, VendorSidebarProps>(({ collapsed, setCollapsed, vendorId, className }, ref) => {
+const VendorSidebar = forwardRef<HTMLDivElement, VendorSidebarProps>(({ collapsed, setCollapsed, className }, ref) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -35,7 +34,7 @@ const VendorSidebar = forwardRef<HTMLDivElement, VendorSidebarProps>(({ collapse
       } bg-white shadow-sm border-r transition-all duration-300 overflow-hidden md:overflow-visible fixed md:static z-10 ${className || ""}`}
     >
       <div className={`flex items-center p-4 ${collapsed ? "hidden md:flex" : "flex"}`}>
-        {!collapsed && <h1 className="text-xl font-bold text-gray-800">VENDOR</h1>}
+        {!collapsed && <h1 className="text-xl font-bold text-gray-800">RelSwad</h1>}
       </div>
       <nav className={`mt-4 ${collapsed ? "hidden md:block" : "block"}`}>
         {vendorMenuItems.map((item, index) => {

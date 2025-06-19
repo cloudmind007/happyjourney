@@ -22,7 +22,7 @@ const RoleBasedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       case "admin":
         return <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} ref={sidebarRef} className="sidebar-admin" />;
       case "vendor":
-        return <VendorSidebar collapsed={collapsed} setCollapsed={setCollapsed} vendorId={userId || undefined} ref={sidebarRef} className="sidebar-vendor" />;
+        return <VendorSidebar collapsed={collapsed} setCollapsed={setCollapsed} ref={sidebarRef} className="sidebar-vendor" />;
       case "user":
         return <UserSidebar collapsed={collapsed} setCollapsed={setCollapsed} ref={sidebarRef} className="sidebar-user" />;
       default:
