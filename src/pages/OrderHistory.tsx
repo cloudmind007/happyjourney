@@ -121,7 +121,7 @@ const statusConfig = {
 };
 
 const paymentConfig = {
-  PAID: {
+  COMPLETED: {
     color: "bg-green-50 text-green-800",
     icon: <CheckCircle className="w-4 h-4" />,
     label: "Payment Successful",
@@ -550,7 +550,7 @@ const OrderHistory: React.FC = () => {
   };
 
   const canDownloadInvoice = (order: OrderDTO) => {
-    return order.orderStatus === "DELIVERED" || order.paymentStatus === "PAID";
+    return order.orderStatus === "DELIVERED" || order.paymentStatus === "COMPLETED";
   };
 
   if (loading) {
