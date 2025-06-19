@@ -18,14 +18,6 @@ const Navbar = () => {
     ? userMenuItems
     : adminMenuItems;
 
-  const currentMenuItem = menuItems.find((item) => {
-    if (item.path === "/vender-detail" && location.pathname.startsWith("/vender-detail/")) {
-      return true;
-    }
-    return item.path === location.pathname;
-  });
-
-  const title = currentMenuItem?.label || "Page";
 
   const handleLogout = async () => {
     try {
@@ -40,7 +32,7 @@ const Navbar = () => {
       console.error("Logout failed", error);
       logout();
       navigate("/login");
-    }
+    } 
   };
 
   useEffect(() => {
