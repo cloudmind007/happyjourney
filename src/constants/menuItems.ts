@@ -31,6 +31,8 @@ export const adminMenuItems: MenuItem[] = [
   { icon: PhoneIncoming, label: "Callback Requests", path: "/contactrequests" }, // PhoneCallback → PhoneIncoming
   { icon: AlertTriangle, label: "Complaints", path: "/complaints" }, // AlertCircle → AlertTriangle (more urgent)
   { icon: Package, label: "Bulk Orders", path: "/bulkorder" }, // BulkOrder → "Bulk Orders" (better readability)
+  {icon:  ShoppingCart, label: "All Orders", path: "/orders" },
+
 ];
 
 export const vendorMenuItems: MenuItem[] = [

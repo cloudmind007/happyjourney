@@ -223,14 +223,14 @@ const AdminOrders: React.FC = () => {
 
       // Fetch active and historical orders
       const [activeResponse, historicalResponse] = await Promise.all([
-        api.get<PageResponse<OrderDTO>>("/api/admin/orders/active", {
+        api.get<PageResponse<OrderDTO>>("/admin/orders/active", {
           params,
           headers: { Authorization: `Bearer ${accessToken}` },
         }).catch((err) => {
           console.error("Failed to fetch active orders:", err);
           return { data: { content: [], pageable: { pageNumber: 0, pageSize: 100 }, totalElements: 0, totalPages: 0 } };
         }),
-        api.get<PageResponse<OrderDTO>>("/api/admin/orders/historical", {
+        api.get<PageResponse<OrderDTO>>("/admin/orders/historical", {
           params,
           headers: { Authorization: `Bearer ${accessToken}` },
         }).catch((err) => {
@@ -378,7 +378,7 @@ const AdminOrders: React.FC = () => {
 
     try {
       const response = await api.put<OrderDTO>(
-        `/api/admin/orders/${orderId}/status`,
+        `/admin/orders/${orderId}/status`,
         { status, remarks: remarks || "" },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
@@ -436,7 +436,7 @@ const AdminOrders: React.FC = () => {
 
     try {
       const response = await api.put<OrderDTO>(
-        `/api/admin/orders/${orderId}/cod-payment-status`,
+        `/admin/orders/${orderId}/cod-payment-status`,
         { paymentStatus, remarks: remarks || "" },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );

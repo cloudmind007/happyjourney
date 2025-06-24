@@ -9,6 +9,7 @@ import UserRegister from "./pages/UserRegister";
 import Restaurant from "./pages/Restaurant";
   import Station from "./pages/Station";
 import RestaurantDetail from "./pages/RestaurantDetail";
+import AdminOrders from "./pages/AdminOrders";
 import VendorHome from "./pages/VendorHome";
 import OrderFood from "./pages/OrderFood";
 import VendorOrders from "./pages/VendorOrders";
@@ -55,11 +56,8 @@ const App = () => {
             <Route path="/complaints" element={<ComplaintsDashboard />} />
             <Route path="/contactrequests" element={<CallbacksDashboard />} />
             <Route path="/vendor-detail/:id" element={<RestaurantDetail/>} />
-            {/* <Route path="/callbackrequests/" element={<CallbackRequest/>} /> */}
+            <Route path="/orders/" element={<AdminOrders/>} />
             <Route path="/vendor-detail/:id" element={<RestaurantDetail/>} />
-
-
-
           </Route>
 
           <Route element={<PrivateRoute allowedRoles={["vendor"]} />}>
