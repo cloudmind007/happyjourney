@@ -27,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 interface OrderItemDTO {
@@ -194,15 +195,50 @@ const AdminOrders: React.FC = () => {
   const [activeOrders, setActiveOrders] = useState<OrderDTO[]>([]);
   const [historicalOrders, setHistoricalOrders] = useState<OrderDTO[]>([]);
   const [stationData, setStationData] = useState<{ [key: number]: StationDTO }>({});
+  const [stations, setStations] = useState<StationDTO[]>([]);
+  const [vendors, setVendors] = useState<VendorDTO[]>([]);
+  const [selectedStation, setSelectedStation] = useState<string>("");
+  const [selectedVendor, setSelectedVendor] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
   const [statusRemarks, setStatusRemarks] = useState<{ [key: number]: string }>({});
   const [codRemarks, setCodRemarks] = useState<{ [key: number]: string }>({});
-  const [vendorFilter, setVendorFilter] = useState<string>("");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+
+  const fetchStations = useCallback(async () => {
+    try {
+      const response = await api.get<StationDTO[]>("/stations/all", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setStations(response.data);
+    } catch (err: any) {
+      console.error("Failed to fetch stations:", err);
+      toast.error("Failed to load stations.");
+    }
+  }, [accessToken]);
+
+  const fetchVendors = useCallback(async (stationId: string) => {
+    if (!stationId) {
+      setVendors([]);
+      return;
+    }
+    try {
+      const response = await api.get<PageResponse<VendorDTO>>(
+        `/vendors/stations/${stationId}`,
+        {
+          params: { page: 0, size: 100 },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+      setVendors(response.data.content || []);
+    } catch (err: any) {
+      console.error(`Failed to fetch vendors for station ${stationId}:`, err);
+      toast.error("Failed to load vendors.");
+    }
+  }, [accessToken]);
 
   const fetchOrdersAndData = useCallback(async () => {
     if (!userId || !accessToken) {
@@ -217,9 +253,9 @@ const AdminOrders: React.FC = () => {
     try {
       // Prepare query parameters for filtering
       const params: any = { page: 0, size: 100 };
-      if (vendorFilter) params.vendorId = Number(vendorFilter);
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
+      if (selectedVendor) params.vendorId = Number(selectedVendor);
+      if (startDate) params.startDate = format(startOfDay(new Date(startDate)), "yyyy-MM-dd'T'HH:mm:ss");
+      if (endDate) params.endDate = format(endOfDay(new Date(endDate)), "yyyy-MM-dd'T'HH:mm:ss");
 
       // Fetch active and historical orders
       const [activeResponse, historicalResponse] = await Promise.all([
@@ -243,9 +279,6 @@ const AdminOrders: React.FC = () => {
       const historicalOrdersData = historicalResponse.data.content || [];
       const allOrders = [...activeOrdersData, ...historicalOrdersData];
 
-      console.log("Active Orders:", activeOrdersData);
-      console.log("Historical Orders:", historicalOrdersData);
-
       if (allOrders.length === 0) {
         setActiveOrders([]);
         setHistoricalOrders([]);
@@ -258,15 +291,12 @@ const AdminOrders: React.FC = () => {
       const itemIds = [...new Set(allOrders.flatMap((o) => o.items.map((i) => i.itemId)))];
       const vendorIds = [...new Set(allOrders.map((o) => o.vendorId))];
 
-      const [stations, items, vendors] = await Promise.all([
+      const [stationsData, items, vendors] = await Promise.all([
         Promise.all(
           stationIds.map((id) =>
             api
               .get<StationDTO>(`/stations/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })
-              .then((res) => {
-                console.log(`Fetched station ${id}:`, res.data);
-                return { [id]: res.data };
-              })
+              .then((res) => ({ [id]: res.data }))
               .catch((err) => {
                 console.error(`Failed to fetch station ${id}:`, err);
                 return {
@@ -285,10 +315,7 @@ const AdminOrders: React.FC = () => {
           itemIds.map((id) =>
             api
               .get<MenuItemDTO>(`/menu/items/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })
-              .then((res) => {
-                console.log(`Fetched item ${id}:`, res.data);
-                return { [id]: res.data };
-              })
+              .then((res) => ({ [id]: res.data }))
               .catch((err) => {
                 console.error(`Failed to fetch item ${id}:`, err);
                 return {
@@ -307,10 +334,7 @@ const AdminOrders: React.FC = () => {
           vendorIds.map((id) =>
             api
               .get<VendorDTO>(`/vendors/${id}`, { headers: { Authorization: `Bearer ${accessToken}` } })
-              .then((res) => {
-                console.log(`Fetched vendor ${id}:`, res.data);
-                return { [id]: res.data };
-              })
+              .then((res) => ({ [id]: res.data }))
               .catch((err) => {
                 console.error(`Failed to fetch vendor ${id}:`, err);
                 return { [id]: { vendorId: id, businessName: `Vendor #${id}` } };
@@ -319,12 +343,8 @@ const AdminOrders: React.FC = () => {
         ).then((results) => Object.assign({}, ...results)),
       ]);
 
-      console.log("Fetched Stations:", stations);
-      console.log("Fetched Items:", items);
-      console.log("Fetched Vendors:", vendors);
-
       // Update state with fetched data
-      setStationData((prev) => ({ ...prev, ...stations }));
+      setStationData((prev) => ({ ...prev, ...stationsData }));
 
       // Transform orders
       const transformedOrders = allOrders.map((order) => ({
@@ -339,8 +359,6 @@ const AdminOrders: React.FC = () => {
           specialInstructions: item.specialInstructions || "No special instructions",
         })),
       }));
-
-      console.log("Transformed Orders:", transformedOrders);
 
       setActiveOrders(
         transformedOrders.filter((o) =>
@@ -360,7 +378,15 @@ const AdminOrders: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [userId, accessToken, vendorFilter, startDate, endDate]);
+  }, [userId, accessToken, selectedVendor, startDate, endDate]);
+
+  useEffect(() => {
+    fetchStations();
+  }, [fetchStations]);
+
+  useEffect(() => {
+    fetchVendors(selectedStation);
+  }, [selectedStation, fetchVendors]);
 
   useEffect(() => {
     fetchOrdersAndData();
@@ -383,9 +409,6 @@ const AdminOrders: React.FC = () => {
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
 
-      console.log(`Updated order ${orderId} status:`, response.data);
-
-      // Update state
       setActiveOrders((prev) =>
         prev.map((order) =>
           order.orderId === orderId
@@ -401,7 +424,6 @@ const AdminOrders: React.FC = () => {
         )
       );
 
-      // Move to historical if DELIVERED or CANCELLED
       if (["DELIVERED", "CANCELLED"].includes(status)) {
         setActiveOrders((prev) =>
           prev.filter((order) => order.orderId !== orderId)
@@ -441,9 +463,6 @@ const AdminOrders: React.FC = () => {
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
 
-      console.log(`Updated COD payment status for order ${orderId}:`, response.data);
-
-      // Update state
       setActiveOrders((prev) =>
         prev.map((order) =>
           order.orderId === orderId
@@ -673,7 +692,7 @@ const AdminOrders: React.FC = () => {
       if (isNaN(date.getTime())) {
         return "Invalid Date";
       }
-      return format(date, forPdf ? "dd MMM yyyy, hh:mm a" : "PPPp");
+      return format(date, forPdf ? "dd MMM yyyy, hh:mm a" : "PPP");
     } catch {
       return "Invalid Date";
     }
@@ -769,74 +788,122 @@ const AdminOrders: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            Admin Orders
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {activeTab === "active"
-              ? "Current and upcoming orders"
-              : "Completed order history"}
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-2">
-          <div className="flex items-center gap-2">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Order Management Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-2">
+          Monitor and manage {activeTab === "active" ? "active" : "completed"} orders efficiently
+        </p>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Filter Orders</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <Label htmlFor="station" className="text-sm font-medium text-gray-700">
+              Select Station
+            </Label>
+            <Select
+              value={selectedStation}
+              onValueChange={(value) => {
+                setSelectedStation(value);
+                setSelectedVendor("");
+              }}
+            >
+              <SelectTrigger id="station" className="mt-1">
+                <SelectValue placeholder="Select a station" />
+              </SelectTrigger>
+              <SelectContent>
+                {stations.map((station) => (
+                  <SelectItem key={station.stationId} value={station.stationId.toString()}>
+                    {station.stationName} ({station.stationCode})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="vendor" className="text-sm font-medium text-gray-700">
+              Select Vendor
+            </Label>
+            <Select
+              value={selectedVendor}
+              onValueChange={setSelectedVendor}
+              disabled={!selectedStation}
+            >
+              <SelectTrigger id="vendor" className="mt-1">
+                <SelectValue placeholder="Select a vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                {vendors.map((vendor) => (
+                  <SelectItem key={vendor.vendorId} value={vendor.vendorId.toString()}>
+                    {vendor.businessName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="startDate" className="text-sm font-medium text-gray-700">
+              Start Date
+            </Label>
             <Input
-              placeholder="Vendor ID"
-              value={vendorFilter}
-              onChange={(e) => setVendorFilter(e.target.value)}
-              className="max-w-xs"
-            />
-            <Input
-              type="datetime-local"
+              id="startDate"
+              type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="max-w-xs"
+              className="mt-1"
             />
+          </div>
+          <div>
+            <Label htmlFor="endDate" className="text-sm font-medium text-gray-700">
+              End Date
+            </Label>
             <Input
-              type="datetime-local"
+              id="endDate"
+              type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="max-w-xs"
+              className="mt-1"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchOrdersAndData}
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                "Refresh"
-              )}
-            </Button>
-            <div className="inline-flex rounded-lg border border-gray-200 bg-white">
-              <button
-                onClick={() => setActiveTab("active")}
-                className={`px-4 py-2 text-sm font-medium ${
-                  activeTab === "active"
-                    ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Active ({activeOrders.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("completed")}
-                className={`px-4 py-2 text-sm font-medium ${
-                  activeTab === "completed"
-                    ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Completed ({historicalOrders.length})
-              </button>
-            </div>
-          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button
+            variant="outline"
+            onClick={fetchOrdersAndData}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              "Apply Filters"
+            )}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center mb-6">
+        <div className="inline-flex rounded-lg border border-gray-200 bg-white">
+          <button
+            onClick={() => setActiveTab("active")}
+            className={`px-4 py-2 text-sm font-medium ${
+              activeTab === "active"
+                ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Active Orders ({activeOrders.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("completed")}
+            className={`px-4 py-2 text-sm font-medium ${
+              activeTab === "completed"
+                ? "bg-blue-50 text-blue-600 border-blue-500 border-t-2 border-b-2"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Completed Orders ({historicalOrders.length})
+          </button>
         </div>
       </div>
 
@@ -1332,7 +1399,7 @@ const AdminOrders: React.FC = () => {
                           >
                             Close Details
                           </Button>
-                          {canDownloadInvoice(order) && (
+                          {/* {canDownloadInvoice(order) && (
                             <Button
                               onClick={() => generateInvoice(order)}
                               className="gap-2"
@@ -1340,7 +1407,7 @@ const AdminOrders: React.FC = () => {
                               <FaDownload className="w-4 h-4" />
                               Download Invoice
                             </Button>
-                          )}
+                          )} */}
                         </div>
                       </div>
                     </div>
