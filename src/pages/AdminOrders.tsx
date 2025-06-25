@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   FaRupeeSign,
-  FaDownload,
   FaMapMarkerAlt,
   FaReceipt,
   FaBoxOpen,
@@ -487,195 +486,195 @@ const AdminOrders: React.FC = () => {
     }
   };
 
-  const generateInvoice = (order: OrderDTO) => {
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
+//   const generateInvoice = (order: OrderDTO) => {
+//     const doc = new jsPDF({
+//       orientation: "portrait",
+//       unit: "mm",
+//       format: "a4",
+//     });
 
-    doc.setFontSize(22);
-    doc.setTextColor(30, 64, 175);
-    doc.setFont("helvetica", "bold");
-    doc.text("RAILWAY EATS", 105, 20, { align: "center" });
+//     doc.setFontSize(22);
+//     doc.setTextColor(30, 64, 175);
+//     doc.setFont("helvetica", "bold");
+//     doc.text("RAILWAY EATS", 105, 20, { align: "center" });
 
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139);
-    doc.setFont("helvetica", "normal");
-    doc.text("Food Delivery On The Go", 105, 26, { align: "center" });
+//     doc.setFontSize(10);
+//     doc.setTextColor(100, 116, 139);
+//     doc.setFont("helvetica", "normal");
+//     doc.text("Food Delivery On The Go", 105, 26, { align: "center" });
 
-    doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`INVOICE #${order.orderId}`, 14, 40);
+//     doc.setFontSize(16);
+//     doc.setTextColor(0, 0, 0);
+//     doc.text(`INVOICE #${order.orderId}`, 14, 40);
 
-    doc.setFontSize(10);
-    doc.text(`Date: ${formatDate(order.deliveryTime, true)}`, 14, 48);
-    doc.text(`Customer ID: ${order.customerId}`, 14, 52);
+//     doc.setFontSize(10);
+//     doc.text(`Date: ${formatDate(order.deliveryTime, true)}`, 14, 48);
+//     doc.text(`Customer ID: ${order.customerId}`, 14, 52);
 
-    doc.setFontSize(12);
-    doc.setTextColor(30, 64, 175);
-    doc.text("Delivery Information", 14, 62);
+//     doc.setFontSize(12);
+//     doc.setTextColor(30, 64, 175);
+//     doc.text("Delivery Information", 14, 62);
 
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    const station = stationData[order.deliveryStationId];
-    doc.text(
-      `Station: ${
-        station
-          ? `${station.stationName} (${station.stationCode})`
-          : `Station #${order.deliveryStationId}`
-      }`,
-      14,
-      68
-    );
-    doc.text(
-      `Train: ${order.trainNumber || `Train #${order.trainId}`}`,
-      14,
-      72
-    );
-    doc.text(
-      `Coach/Seat: ${order.coachNumber}/${order.seatNumber}`,
-      14,
-      76
-    );
-    doc.text(`Delivery Time: ${formatDate(order.deliveryTime, true)}`, 14, 80);
-    doc.text(
-      `Vendor: ${order.vendorName || `Vendor #${order.vendorId}`}`,
-      14,
-      84
-    );
+//     doc.setFontSize(10);
+//     doc.setTextColor(0, 0, 0);
+//     const station = stationData[order.deliveryStationId];
+//     doc.text(
+//       `Station: ${
+//         station
+//           ? `${station.stationName} (${station.stationCode})`
+//           : `Station #${order.deliveryStationId}`
+//       }`,
+//       14,
+//       68
+//     );
+//     doc.text(
+//       `Train: ${order.trainNumber || `Train #${order.trainId}`}`,
+//       14,
+//       72
+//     );
+//     doc.text(
+//       `Coach/Seat: ${order.coachNumber}/${order.seatNumber}`,
+//       14,
+//       76
+//     );
+//     doc.text(`Delivery Time: ${formatDate(order.deliveryTime, true)}`, 14, 80);
+//     doc.text(
+//       `Vendor: ${order.vendorName || `Vendor #${order.vendorId}`}`,
+//       14,
+//       84
+//     );
 
-    if (order.deliveryInstructions) {
-      doc.text(`Instructions: ${order.deliveryInstructions}`, 14, 88);
-    }
+//     if (order.deliveryInstructions) {
+//       doc.text(`Instructions: ${order.deliveryInstructions}`, 14, 88);
+//     }
 
-    doc.setFontSize(12);
-    doc.setTextColor(30, 64, 175);
-    doc.text("Order Items", 14, 98);
+//     doc.setFontSize(12);
+//     doc.setTextColor(30, 64, 175);
+//     doc.text("Order Items", 14, 98);
 
-    const headers = [["No.", "Item", "Qty", "Unit Price", "Total", "Notes"]];
-    const data = order.items.map((item, index) => [
-      index + 1,
-      item.itemName || `Item #${item.itemId}`,
-      item.quantity,
-      `₹${item.unitPrice.toFixed(2)}`,
-      `₹${(item.quantity * item.unitPrice).toFixed(2)}`,
-      item.specialInstructions || "-",
-    ]);
+//     const headers = [["No.", "Item", "Qty", "Unit Price", "Total", "Notes"]];
+//     const data = order.items.map((item, index) => [
+//       index + 1,
+//       item.itemName || `Item #${item.itemId}`,
+//       item.quantity,
+//       `₹${item.unitPrice.toFixed(2)}`,
+//       `₹${(item.quantity * item.unitPrice).toFixed(2)}`,
+//       item.specialInstructions || "-",
+//     ]);
 
-    autoTable(doc, {
-      startY: 102,
-      head: headers,
-      body: data,
-      theme: "grid",
-      headStyles: {
-        fillColor: [30, 64, 175],
-        textColor: 255,
-        fontStyle: "bold",
-      },
-      columnStyles: {
-        0: { cellWidth: 10 },
-        1: { cellWidth: 50 },
-        2: { cellWidth: 15 },
-        3: { cellWidth: 25 },
-        4: { cellWidth: 25 },
-        5: { cellWidth: 50 },
-      },
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-        overflow: "linebreak",
-      },
-    });
+//     autoTable(doc, {
+//       startY: 102,
+//       head: headers,
+//       body: data,
+//       theme: "grid",
+//       headStyles: {
+//         fillColor: [30, 64, 175],
+//         textColor: 255,
+//         fontStyle: "bold",
+//       },
+//       columnStyles: {
+//         0: { cellWidth: 10 },
+//         1: { cellWidth: 50 },
+//         2: { cellWidth: 15 },
+//         3: { cellWidth: 25 },
+//         4: { cellWidth: 25 },
+//         5: { cellWidth: 50 },
+//       },
+//       styles: {
+//         fontSize: 9,
+//         cellPadding: 3,
+//         overflow: "linebreak",
+//       },
+//     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(12);
-    doc.setTextColor(30, 64, 175);
-    doc.text("Order Summary", 14, finalY);
+//     const finalY = (doc as any).lastAutoTable.finalY + 10;
+//     doc.setFontSize(12);
+//     doc.setTextColor(30, 64, 175);
+//     doc.text("Order Summary", 14, finalY);
 
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.text(
-      `Subtotal: ₹${order.totalAmount.toFixed(2)}`,
-      150,
-      finalY + 6,
-      { align: "right" }
-    );
-    doc.text(
-      `Delivery Charges: ₹${order.deliveryCharges.toFixed(2)}`,
-      150,
-      finalY + 12,
-      { align: "right" }
-    );
-    doc.text(
-      `Tax (${order.taxPercentage || 5}%): ₹${order.taxAmount.toFixed(2)}`,
-      150,
-      finalY + 18,
-      { align: "right" }
-    );
+//     doc.setFontSize(10);
+//     doc.setTextColor(0, 0, 0);
+//     doc.text(
+//       `Subtotal: ₹${order.totalAmount.toFixed(2)}`,
+//       150,
+//       finalY + 6,
+//       { align: "right" }
+//     );
+//     doc.text(
+//       `Delivery Charges: ₹${order.deliveryCharges.toFixed(2)}`,
+//       150,
+//       finalY + 12,
+//       { align: "right" }
+//     );
+//     doc.text(
+//       `Tax (${order.taxPercentage || 5}%): ₹${order.taxAmount.toFixed(2)}`,
+//       150,
+//       finalY + 18,
+//       { align: "right" }
+//     );
 
-    if (order.discountAmount && order.discountAmount > 0) {
-      doc.text(
-        `Discount: -₹${order.discountAmount.toFixed(2)}`,
-        150,
-        finalY + 24,
-        { align: "right" }
-      );
-      doc.setFont("helvetica", "bold");
-      doc.text(
-        `Total Amount: ₹${order.finalAmount.toFixed(2)}`,
-        150,
-        finalY + 32,
-        { align: "right" }
-      );
-    } else {
-      doc.setFont("helvetica", "bold");
-      doc.text(
-        `Total Amount: ₹${order.finalAmount.toFixed(2)}`,
-        150,
-        finalY + 24,
-        { align: "right" }
-      );
-    }
+//     if (order.discountAmount && order.discountAmount > 0) {
+//       doc.text(
+//         `Discount: -₹${order.discountAmount.toFixed(2)}`,
+//         150,
+//         finalY + 24,
+//         { align: "right" }
+//       );
+//       doc.setFont("helvetica", "bold");
+//       doc.text(
+//         `Total Amount: ₹${order.finalAmount.toFixed(2)}`,
+//         150,
+//         finalY + 32,
+//         { align: "right" }
+//       );
+//     } else {
+//       doc.setFont("helvetica", "bold");
+//       doc.text(
+//         `Total Amount: ₹${order.finalAmount.toFixed(2)}`,
+//         150,
+//         finalY + 24,
+//         { align: "right" }
+//       );
+//     }
 
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(30, 64, 175);
-    doc.text("Payment Information", 14, finalY + 42);
+//     doc.setFont("helvetica", "normal");
+//     doc.setTextColor(30, 64, 175);
+//     doc.text("Payment Information", 14, finalY + 42);
 
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.text(
-      `Method: ${paymentMethodConfig[order.paymentMethod].label}`,
-      14,
-      finalY + 48
-    );
-    doc.text(
-      `Status: ${paymentConfig[order.paymentStatus].label}`,
-      14,
-      finalY + 52
-    );
+//     doc.setFontSize(10);
+//     doc.setTextColor(0, 0, 0);
+//     doc.text(
+//       `Method: ${paymentMethodConfig[order.paymentMethod].label}`,
+//       14,
+//       finalY + 48
+//     );
+//     doc.text(
+//       `Status: ${paymentConfig[order.paymentStatus].label}`,
+//       14,
+//       finalY + 52
+//     );
 
-    if (order.razorpayOrderID) {
-      doc.text(`Transaction ID: ${order.razorpayOrderID}`, 14, finalY + 56);
-    }
+//     if (order.razorpayOrderID) {
+//       doc.text(`Transaction ID: ${order.razorpayOrderID}`, 14, finalY + 56);
+//     }
 
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.text(
-      "Thank you for choosing Railway Eats!",
-      105,
-      280,
-      { align: "center" }
-    );
-    doc.text(
-      "For any queries, please contact support@railwayeats.com",
-      105,
-      284,
-      { align: "center" }
-    );
+//     doc.setFontSize(8);
+//     doc.setTextColor(100, 116, 139);
+//     doc.text(
+//       "Thank you for choosing Railway Eats!",
+//       105,
+//       280,
+//       { align: "center" }
+//     );
+//     doc.text(
+//       "For any queries, please contact support@railwayeats.com",
+//       105,
+//       284,
+//       { align: "center" }
+//     );
 
-    doc.save(`RelSwad_Invoice_${order.orderId}.pdf`);
-  };
+//     doc.save(`RelSwad_Invoice_${order.orderId}.pdf`);
+//   };
 
   const currentOrders = useMemo(
     () => (activeTab === "active" ? activeOrders : historicalOrders),
@@ -716,9 +715,9 @@ const AdminOrders: React.FC = () => {
     }
   };
 
-  const canDownloadInvoice = (order: OrderDTO) => {
-    return order.orderStatus === "DELIVERED" || order.paymentStatus === "COMPLETED";
-  };
+//   const canDownloadInvoice = (order: OrderDTO) => {
+//     return order.orderStatus === "DELIVERED" || order.paymentStatus === "COMPLETED";
+//   };
 
   const canUpdateStatus = (order: OrderDTO) => {
     return ["PLACED", "PENDING", "PREPARING", "DISPATCHED"].includes(
