@@ -17,8 +17,8 @@ import {
   Truck,
   ChefHat,
 } from "lucide-react";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+// import { jsPDF } from "jspdf";
+// import autoTable from "jspdf-autotable";
 import api from "@/utils/axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
