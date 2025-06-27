@@ -2,10 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   FaRupeeSign,
   FaMapMarkerAlt,
-  FaBoxOpen,
 } from "react-icons/fa";
 import { MdPayment, MdFastfood } from "react-icons/md";
-import { IoTime } from "react-icons/io5";
 import {
   CheckCircle,
   XCircle,
@@ -18,11 +16,11 @@ import {
 } from "lucide-react";
 import api from "@/utils/axios";
 import { useAuth } from "@/contexts/AuthContext";
-import { motion, AnimatePresence } from "framer-motion";
-import { Skeleton } from "@/components/ui/skeleton";
+// import { motion, AnimatePresence } from "framer-motion";
+// import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+// import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, startOfDay, endOfDay } from "date-fns";
 import {
   Select,
