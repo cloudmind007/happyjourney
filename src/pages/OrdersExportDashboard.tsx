@@ -1,73 +1,76 @@
-import { FC, useEffect, useState, useCallback } from "react";
-import axios from "../utils/axios"; // Ensure axios is configured with baseURL
-import { Download } from "lucide-react";
+import React, { FC, useEffect, useState, useCallback } from "react";
+import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Select, { OptionsType, SingleValue } from "react-select";
-import { useMediaQuery } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import { format } from "date-fns";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { format, startOfDay, endOfDay } from "date-fns";
+import api from "@/utils/axios";
 
-// Interfaces based on StationDTO and VendorDTO from backend
-interface Station {
-  id: number;
+interface StationDTO {
+  stationId: number;
   stationName: string;
   stationCode: string;
-  city?: string;
-  state?: string;
-  pincode?: string;
-  latitude?: number;
-  longitude?: number;
+  city: string;
+  state: string;
 }
 
-interface Vendor {
-  id: number;
-  name: string;
+interface VendorDTO {
+  vendorId: number;
+  businessName: string;
 }
 
-// Type for react-select options
-interface SelectOption<T> {
-  value: T;
-  label: string;
+interface PageResponse<T> {
+  content: T[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+  };
+  totalElements: number;
+  totalPages: number;
 }
 
 const OrdersExportDashboard: FC = () => {
-  const [stations, setStations] = useState<Station[]>([]);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
-  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
+  const { accessToken } = useAuth();
+  const [stations, setStations] = useState<StationDTO[]>([]);
+  const [vendors, setVendors] = useState<VendorDTO[]>([]);
+  const [selectedStation, setSelectedStation] = useState<string>("");
+  const [selectedVendor, setSelectedVendor] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
-  // Fetch stations from /api/stations/all
+  // Fetch stations from /stations/all
   const fetchStations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("jwt"); // Adjust key based on your app
-      if (!token) throw new Error("No authentication token found");
-
-      const res = await axios.get("/api/stations/all", {
-        headers: { Authorization: `Bearer ${token}` },
+      if (!accessToken) throw new Error("No authentication token found");
+      const response = await api.get<StationDTO[]>("/stations/all", {
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
-      setStations(Array.isArray(res.data) ? res.data : []);
+      setStations(response.data || []);
     } catch (err: any) {
       console.error("Failed to fetch stations:", err);
       setError(err.response?.data?.message || "Failed to load stations");
+      toast.error("Failed to load stations.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [accessToken]);
 
-  // Fetch vendors based on selected station from /api/vendors/stations/{stationId}
-  const fetchVendors = useCallback(async (stationId: number) => {
+  // Fetch vendors based on selected station from /vendors/stations/{stationId}
+  const fetchVendors = useCallback(async (stationId: string) => {
     if (!stationId) {
       setVendors([]);
       return;
@@ -75,68 +78,54 @@ const OrdersExportDashboard: FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("jwt");
-      if (!token) throw new Error("No authentication token found");
-
-      const res = await axios.get(`/api/vendors/stations/${stationId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { page: 0, size: 1000 },
-      });
-      setVendors(Array.isArray(res.data.content) ? res.data.content : []);
+      if (!accessToken) throw new Error("No authentication token found");
+      const response = await api.get<PageResponse<VendorDTO>>(
+        `/vendors/stations/${stationId}`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          params: { page: 0, size: 1000 },
+        }
+      );
+      setVendors(response.data.content || []);
     } catch (err: any) {
       console.error("Failed to fetch vendors:", err);
       setError(err.response?.data?.message || "Failed to load vendors");
+      toast.error("Failed to load vendors.");
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  // Handle station selection
-  const handleStationChange = (selectedOption: SingleValue<SelectOption<Station>>) => {
-    const station = selectedOption ? selectedOption.value : null;
-    setSelectedStation(station);
-    setSelectedVendor(null); // Reset vendor when station changes
-    setVendors([]); // Clear vendors
-    if (station) {
-      fetchVendors(station.id);
-    }
-  };
-
-  // Handle vendor selection
-  const handleVendorChange = (selectedOption: SingleValue<SelectOption<Vendor>>) => {
-    setSelectedVendor(selectedOption ? selectedOption.value : null);
-  };
+  }, [accessToken]);
 
   // Handle Excel export
   const handleExport = async () => {
     if (!startDate || !endDate) {
       setError("Please select both start and end dates");
+      toast.error("Please select both start and end dates");
       return;
     }
-    if (endDate < startDate) {
+    if (new Date(endDate) < new Date(startDate)) {
       setError("End date must be after start date");
+      toast.error("End date must be after start date");
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("jwt");
-      if (!token) throw new Error("No authentication token found");
-
+      if (!accessToken) throw new Error("No authentication token found");
       const queryParams = new URLSearchParams();
-      if (selectedStation) queryParams.append("stationId", selectedStation.id.toString());
-      if (selectedVendor) queryParams.append("vendorId", selectedVendor.id.toString());
-      queryParams.append("startDate", format(startDate, "yyyy-MM-dd"));
-      queryParams.append("endDate", format(endDate, "yyyy-MM-dd"));
+      if (selectedStation) queryParams.append("stationId", selectedStation);
+      if (selectedVendor) queryParams.append("vendorId", selectedVendor);
+      queryParams.append("startDate", format(startOfDay(new Date(startDate)), "yyyy-MM-dd'T'HH:mm:ss"));
+      queryParams.append("endDate", format(endOfDay(new Date(endDate)), "yyyy-MM-dd'T'HH:mm:ss"));
 
-      const res = await axios.get(`/api/admin/orders/export-excel?${queryParams.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await api.get(`/admin/orders/export-excel?${queryParams.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
         responseType: "blob",
       });
 
       // Trigger file download
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `orders_export_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
@@ -144,9 +133,11 @@ const OrdersExportDashboard: FC = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      toast.success("Orders exported successfully!");
     } catch (err: any) {
       console.error("Failed to export orders:", err);
       setError(err.response?.data?.message || "Failed to export orders. Please try again.");
+      toast.error(err.response?.data?.message || "Failed to export orders.");
     } finally {
       setLoading(false);
     }
@@ -157,16 +148,10 @@ const OrdersExportDashboard: FC = () => {
     fetchStations();
   }, [fetchStations]);
 
-  // Station and vendor options for react-select
-  const stationOptions: OptionsType<SelectOption<Station>> = stations.map((station) => ({
-    value: station,
-    label: `${station.stationName} (${station.stationCode})`,
-  }));
-
-  const vendorOptions: OptionsType<SelectOption<Vendor>> = vendors.map((vendor) => ({
-    value: vendor,
-    label: vendor.name,
-  }));
+  // Fetch vendors when station changes
+  useEffect(() => {
+    fetchVendors(selectedStation);
+  }, [selectedStation, fetchVendors]);
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
@@ -177,7 +162,9 @@ const OrdersExportDashboard: FC = () => {
       )}
       <Card className="w-full shadow-md border border-blue-100">
         <CardHeader className="bg-blue-50">
-          <CardTitle className="text-xl sm:text-2xl font-bold text-blue-800">Orders Export Dashboard</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl font-bold text-blue-800">
+            Orders Export Dashboard
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-3 sm:p-6">
           {error && (
@@ -185,61 +172,99 @@ const OrdersExportDashboard: FC = () => {
               {error}
             </div>
           )}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap">
-            <div className="flex-1 sm:max-w-[250px]">
-              <Select
-                options={stationOptions}
-                value={stationOptions.find((option: SelectOption<Station>) => option.value.id === selectedStation?.id) || null}
-                onChange={handleStationChange}
-                placeholder="Select Station"
-                className="w-full text-sm"
-                classNamePrefix="select"
-                isClearable
-                aria-label="Select station"
-              />
+          <div className="bg-white rounded-lg shadow-sm p-4 mb-6 border border-blue-100">
+            <h2 className="text-lg font-semibold text-blue-800 mb-4">Filter Orders for Export</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div>
+                <Label htmlFor="station" className="text-sm font-medium text-blue-700">
+                  Select Station
+                </Label>
+                <Select
+                  value={selectedStation}
+                  onValueChange={(value) => {
+                    setSelectedStation(value);
+                    setSelectedVendor("");
+                  }}
+                >
+                  <SelectTrigger
+                    id="station"
+                    className="mt-1 text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <SelectValue placeholder="Select a station" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stations.map((station) => (
+                      <SelectItem key={station.stationId} value={station.stationId.toString()}>
+                        {station.stationName} ({station.stationCode})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="vendor" className="text-sm font-medium text-blue-700">
+                  Select Vendor
+                </Label>
+                <Select
+                  value={selectedVendor}
+                  onValueChange={setSelectedVendor}
+                  disabled={!selectedStation}
+                >
+                  <SelectTrigger
+                    id="vendor"
+                    className="mt-1 text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <SelectValue placeholder="Select a vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendors.map((vendor) => (
+                      <SelectItem key={vendor.vendorId} value={vendor.vendorId.toString()}>
+                        {vendor.businessName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="startDate" className="text-sm font-medium text-blue-700">
+                  Start Date
+                </Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="mt-1 text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500 h-10 w-full"
+                />
+              </div>
+              <div>
+                <Label htmlFor="endDate" className="text-sm font-medium text-blue-700">
+                  End Date
+                </Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="mt-1 text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500 h-10 w-full"
+                />
+              </div>
             </div>
-            <div className="flex-1 sm:max-w-[250px]">
-              <Select
-                options={vendorOptions}
-                value={vendorOptions.find((option: { value: Vendor; label: string }) => option.value.id === selectedVendor?.id) || null}
-                onChange={handleVendorChange}
-                placeholder="Select Vendor"
-                className="w-full text-sm"
-                classNamePrefix="select"
-                isClearable
-                isDisabled={!selectedStation}
-                aria-label="Select vendor"
-              />
+            <div className="mt-4 flex justify-end">
+              <Button
+                onClick={handleExport}
+                className="bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+                disabled={loading}
+                aria-label="Export orders to Excel"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                Export Excel
+              </Button>
             </div>
-            <div className="flex-1 sm:max-w-[200px]">
-              <DatePicker
-                selected={startDate}
-                onChange={(date: Date | null) => setStartDate(date)}
-                placeholderText="Start Date"
-                className="w-full text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500 rounded-md px-3 py-2"
-                dateFormat="yyyy-MM-dd"
-                aria-label="Select start date"
-              />
-            </div>
-            <div className="flex-1 sm:max-w-[200px]">
-              <DatePicker
-                selected={endDate}
-                onChange={(date: Date | null) => setEndDate(date)}
-                placeholderText="End Date"
-                className="w-full text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500 rounded-md px-3 py-2"
-                dateFormat="yyyy-MM-dd"
-                aria-label="Select end date"
-              />
-            </div>
-            <Button
-              onClick={handleExport}
-              className="bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
-              disabled={loading}
-              aria-label="Export orders to Excel"
-            >
-              <Download className="h-4 w-4" />
-              Export Excel
-            </Button>
           </div>
           <div className="flex flex-col items-center justify-center py-10">
             <h2 className="text-lg sm:text-xl font-semibold text-blue-600">Export Orders</h2>

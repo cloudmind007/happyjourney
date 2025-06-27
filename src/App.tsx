@@ -31,6 +31,7 @@ import OrderConfirmation from "./pages/OrderConfirmation";
 import BulkOrdersDashboard from "./pages/BulkOrderDashboard";
 import ComplaintsDashboard from "./pages/ComplaintsDashboard";
 import CallbacksDashboard from "./pages/CallbacksDashboard";
+import OrdersExportDashboard from "./pages/OrdersExportDashboard";
 
 const App = () => {
   return (
@@ -57,6 +58,7 @@ const App = () => {
             <Route path="/contactrequests" element={<CallbacksDashboard />} />
             <Route path="/vendor-detail/:id" element={<RestaurantDetail/>} />
             <Route path="/orders/" element={<AdminOrders/>} />
+            <Route path="/orders-export/" element={<OrdersExportDashboard/>} />
             <Route path="/vendor-detail/:id" element={<RestaurantDetail/>} />
           </Route>
 

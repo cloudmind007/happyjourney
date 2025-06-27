@@ -16,6 +16,7 @@ import {
   Package,
   PhoneIncoming,
   Train,
+  Download,
 } from "lucide-react";
 
 export type MenuItem = {
@@ -32,7 +33,7 @@ export const adminMenuItems: MenuItem[] = [
   { icon: AlertTriangle, label: "Complaints", path: "/complaints" }, // AlertCircle → AlertTriangle (more urgent)
   { icon: Package, label: "Bulk Orders", path: "/bulkorder" }, // BulkOrder → "Bulk Orders" (better readability)
   {icon:  ShoppingCart, label: "All Orders", path: "/orders" },
-
+  {icon:  Download, label: "Orders Export", path: "/orders-export" },
 ];
 
 export const vendorMenuItems: MenuItem[] = [
