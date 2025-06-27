@@ -12,14 +12,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend,LineController } from 'chart.js';
+import { Chart as ChartJS, CategoryScale,Filler,LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend,LineController,BarController } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import api from '@/utils/axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, startOfDay, endOfDay } from 'date-fns';
 
 // Register Chart.js components
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend,LineController);
+ChartJS.register(Filler,CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend,LineController, BarController);
 
 // Define interfaces for DTOs based on Java backend
 interface StationDTO {
