@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DollarSign, ShoppingCart, Utensils, TrendingUp, Loader2 } from 'lucide-react';
+import { DollarSign, ShoppingCart, Utensils, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -12,8 +12,20 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from 'chart.js';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 import api from '@/utils/axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, startOfDay, endOfDay } from 'date-fns';
@@ -529,7 +541,7 @@ const AdminDashboard: React.FC = () => {
           </CardHeader>
           <CardContent className="p-3 sm:p-6">
             <div className="h-96">
-              <Line
+              <Chart type="line"
                 data={chartData}
                 options={{
                   responsive: true,
