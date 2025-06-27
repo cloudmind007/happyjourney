@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
 import api from '@/utils/axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, startOfDay, endOfDay } from 'date-fns';
@@ -529,7 +529,8 @@ const AdminDashboard: React.FC = () => {
           </CardHeader>
           <CardContent className="p-3 sm:p-6">
             <div className="h-96">
-              <Line
+              <Chart
+                type='bar'
                 data={chartData}
                 options={{
                   responsive: true,
