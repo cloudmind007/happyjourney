@@ -1,25 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DollarSign, ShoppingCart, Utensils, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Chart as ChartJS, CategoryScale,Filler,LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend,LineController,BarController } from 'chart.js';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import Select from 'react-select';
+import { Chart as ChartJS, CategoryScale, Filler, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, LineController, BarController } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import api from '@/utils/axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, startOfDay, endOfDay } from 'date-fns';
 
 // Register Chart.js components
-ChartJS.register(Filler,CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend,LineController, BarController);
+ChartJS.register(Filler, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, LineController, BarController);
 
 // Define interfaces for DTOs based on Java backend
 interface StationDTO {
@@ -82,6 +78,13 @@ interface ApiParams {
   vendorId?: string;
 }
 
+// Define interface for react-select options
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+// AdminDashboard Component
 const AdminDashboard: React.FC = () => {
   const { accessToken } = useAuth();
   const [stations, setStations] = useState<StationDTO[]>([]);
@@ -92,30 +95,29 @@ const AdminDashboard: React.FC = () => {
   const [stationSales, setStationSales] = useState<StationSalesSummaryDTO[]>([]);
   const [topItems, setTopItems] = useState<TopSellingItemDTO[]>([]);
   const [monthlySales, setMonthlySales] = useState<MonthlySalesDTO[]>([]);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Get current date for max date validation
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = useMemo(() => new Date(), []);
 
   // Validate dates
-  const validateDates = (start: string, end: string): boolean => {
+  const validateDates = useCallback((start: Date | null, end: Date | null): boolean => {
     if (!start || !end) {
-      setError(null);
-      return true; // Allow empty dates
+      setError('Please select both start and end dates');
+      toast.error('Please select both start and end dates');
+      return false;
     }
-    const startDateObj = new Date(start);
-    const endDateObj = new Date(end);
-    if (endDateObj < startDateObj) {
+    if (end < start) {
       setError('End date must be after start date');
       toast.error('End date must be after start date');
       return false;
     }
     setError(null);
     return true;
-  };
+  }, []);
 
   // Fetch stations
   const fetchStations = useCallback(async () => {
@@ -168,14 +170,14 @@ const AdminDashboard: React.FC = () => {
   );
 
   // Fetch vendor sales overview
-  const fetchVendorsSales = async () => {
+  const fetchVendorsSales = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       if (!accessToken) throw new Error('No authentication token found');
       const params: ApiParams = {};
-      if (startDate) params.startDate = format(startOfDay(new Date(startDate)), "yyyy-MM-dd'T'HH:mm:ss");
-      if (endDate) params.endDate = format(endOfDay(new Date(endDate)), "yyyy-MM-dd'T'HH:mm:ss");
+      if (startDate) params.startDate = format(startOfDay(startDate), "yyyy-MM-dd'T'HH:mm:ss");
+      if (endDate) params.endDate = format(endOfDay(endDate), "yyyy-MM-dd'T'HH:mm:ss");
       if (selectedStation) params.stationId = selectedStation;
       if (selectedVendor) params.vendorId = selectedVendor;
       const response = await api.get<VendorSalesOverviewDTO[]>('/admin/analytics/vendors/sales', {
@@ -190,10 +192,10 @@ const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, startDate, endDate, selectedStation, selectedVendor]);
 
   // Fetch station sales for last month
-  const fetchStationsSales = async () => {
+  const fetchStationsSales = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -209,17 +211,17 @@ const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   // Fetch top selling items for a vendor
-  const fetchTopItems = async (vendorId: string) => {
+  const fetchTopItems = useCallback(async (vendorId: string) => {
     setLoading(true);
     setError(null);
     try {
       if (!accessToken) throw new Error('No authentication token found');
       const params: ApiParams = { limit: 5, sortBy: 'quantity' };
-      if (startDate) params.startDate = format(startOfDay(new Date(startDate)), "yyyy-MM-dd'T'HH:mm:ss");
-      if (endDate) params.endDate = format(endOfDay(new Date(endDate)), "yyyy-MM-dd'T'HH:mm:ss");
+      if (startDate) params.startDate = format(startOfDay(startDate), "yyyy-MM-dd'T'HH:mm:ss");
+      if (endDate) params.endDate = format(endOfDay(endDate), "yyyy-MM-dd'T'HH:mm:ss");
       const response = await api.get<TopSellingItemDTO[]>(`/admin/analytics/vendors/${vendorId}/favorite-items`, {
         headers: { Authorization: `Bearer ${accessToken}` },
         params,
@@ -232,17 +234,17 @@ const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, startDate, endDate]);
 
   // Fetch monthly sales for a vendor
-  const fetchMonthlySales = async (vendorId: string) => {
+  const fetchMonthlySales = useCallback(async (vendorId: string) => {
     setLoading(true);
     setError(null);
     try {
       if (!accessToken) throw new Error('No authentication token found');
       const params: ApiParams = {};
-      if (startDate) params.startDate = format(startOfDay(new Date(startDate)), "yyyy-MM-dd'T'HH:mm:ss");
-      if (endDate) params.endDate = format(endOfDay(new Date(endDate)), "yyyy-MM-dd'T'HH:mm:ss");
+      if (startDate) params.startDate = format(startOfDay(startDate), "yyyy-MM-dd'T'HH:mm:ss");
+      if (endDate) params.endDate = format(endOfDay(endDate), "yyyy-MM-dd'T'HH:mm:ss");
       const response = await api.get<MonthlySalesDTO[]>(`/admin/analytics/vendors/${vendorId}/sales/monthly`, {
         headers: { Authorization: `Bearer ${accessToken}` },
         params,
@@ -255,19 +257,19 @@ const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, startDate, endDate]);
 
   // Initial data fetch
   useEffect(() => {
     fetchStations();
     fetchStationsSales();
-  }, [fetchStations]);
+  }, [fetchStations, fetchStations]);
 
   // Fetch vendors and sales when station or filters change
   useEffect(() => {
     fetchVendors(selectedStation);
     fetchVendorsSales();
-  }, [selectedStation, startDate, endDate, selectedVendor, fetchVendors]);
+  }, [selectedStation, startDate, endDate, selectedVendor, fetchVendors, fetchVendorsSales]);
 
   // Fetch vendor-specific data when vendor is selected
   useEffect(() => {
@@ -278,7 +280,7 @@ const AdminDashboard: React.FC = () => {
       setTopItems([]);
       setMonthlySales([]);
     }
-  }, [selectedVendor, startDate, endDate]);
+  }, [selectedVendor, startDate, endDate, fetchTopItems, fetchMonthlySales]);
 
   // Handle filter submission
   const handleFilterSubmit = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -298,68 +300,128 @@ const AdminDashboard: React.FC = () => {
   };
 
   // Calculate stats for cards
-  const totalEarnings = vendorSales.reduce((sum, v) => sum + (v.totalAmount || 0), 0);
-  const totalOrders = vendorSales.reduce((sum, v) => sum + (v.orderCount || 0), 0);
+  const totalEarnings = useMemo(() => vendorSales.reduce((sum, v) => sum + (v.totalAmount || 0), 0), [vendorSales]);
+  const totalOrders = useMemo(() => vendorSales.reduce((sum, v) => sum + (v.orderCount || 0), 0), [vendorSales]);
   const totalRestaurants = vendorSales.length;
-  const avgOrderValue = totalOrders ? (totalEarnings / totalOrders).toFixed(2) : '0.00';
-  const formattedTotalEarnings = totalEarnings.toFixed(2);
+  const avgOrderValue = useMemo(() => (totalOrders ? (totalEarnings / totalOrders).toFixed(2) : '0.00'), [totalEarnings, totalOrders]);
+  const formattedTotalEarnings = useMemo(() => totalEarnings.toFixed(2), [totalEarnings]);
 
-  const statsCards = [
-    {
-      title: 'Total Earnings',
-      value: `₹${formattedTotalEarnings}`,
-      icon: DollarSign,
-      color: 'bg-gradient-to-r from-blue-600 to-blue-700',
-      textColor: 'text-blue-600',
-    },
-    {
-      title: 'Total Orders',
-      value: totalOrders,
-      icon: ShoppingCart,
-      color: 'bg-gradient-to-r from-green-600 to-green-700',
-      textColor: 'text-green-600',
-    },
-    {
-      title: 'Total Restaurants',
-      value: totalRestaurants,
-      icon: Utensils,
-      color: 'bg-gradient-to-r from-orange-600 to-orange-700',
-      textColor: 'text-orange-600',
-    },
-    {
-      title: 'Avg Order Value',
-      value: `₹${avgOrderValue}`,
-      icon: TrendingUp,
-      color: 'bg-gradient-to-r from-purple-600 to-purple-700',
-      textColor: 'text-purple-600',
-    },
-  ];
-
-  // Chart data for Monthly Sales
-  const chartData = {
-    labels: monthlySales.map((sale) => sale.month),
-    datasets: [
+  const statsCards = useMemo(
+    () => [
       {
-        label: 'Total Revenue (₹)',
-        data: monthlySales.map((sale) => sale.totalRevenue),
-        type: 'line' as const,
-        borderColor: 'rgba(59, 130, 246, 1)',
-        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-        fill: true,
-        tension: 0.4,
-        yAxisID: 'y',
+        title: 'Total Earnings',
+        value: `₹${formattedTotalEarnings}`,
+        icon: DollarSign,
+        color: 'bg-gradient-to-r from-blue-600 to-blue-700',
+        textColor: 'text-blue-600',
       },
       {
-        label: 'Total Orders',
-        data: monthlySales.map((sale) => sale.totalOrders),
-        type: 'bar' as const,
-        backgroundColor: 'rgba(34, 197, 94, 0.5)',
-        borderColor: 'rgba(34, 197, 94, 1)',
-        borderWidth: 1,
-        yAxisID: 'y1',
+        title: 'Total Orders',
+        value: totalOrders,
+        icon: ShoppingCart,
+        color: 'bg-gradient-to-r from-green-600 to-green-700',
+        textColor: 'text-green-600',
+      },
+      {
+        title: 'Total Restaurants',
+        value: totalRestaurants,
+        icon: Utensils,
+        color: 'bg-gradient-to-r from-orange-600 to-orange-700',
+        textColor: 'text-orange-600',
+      },
+      {
+        title: 'Avg Order Value',
+        value: `₹${avgOrderValue}`,
+        icon: TrendingUp,
+        color: 'bg-gradient-to-r from-purple-600 to-purple-700',
+        textColor: 'text-purple-600',
       },
     ],
+    [formattedTotalEarnings, totalOrders, totalRestaurants, avgOrderValue]
+  );
+
+  // Options for react-select
+  const stationOptions = useMemo(
+    () =>
+      stations.map((station) => ({
+        value: station.stationId.toString(),
+        label: `${station.stationName} (${station.stationCode})`,
+      })),
+    [stations]
+  );
+
+  const vendorOptions = useMemo(
+    () =>
+      vendors.map((vendor) => ({
+        value: vendor.vendorId.toString(),
+        label: vendor.businessName,
+      })),
+    [vendors]
+  );
+
+  // Custom styles for react-select to match Tailwind theme
+  const selectStyles = {
+    control: (provided: any) => ({
+      ...provided,
+      borderColor: '#93c5fd',
+      boxShadow: 'none',
+      '&:hover': {
+        borderColor: '#3b82f6',
+      },
+      minHeight: '2.5rem',
+      fontSize: '0.875rem',
+    }),
+    menu: (provided: any) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    option: (provided: any, state: any) => ({
+      ...provided,
+      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#e0f2fe' : 'white',
+      color: state.isSelected ? 'white' : '#1f2937',
+      '&:hover': {
+        backgroundColor: '#e0f2fe',
+        color: '#1f2937',
+      },
+    }),
+    singleValue: (provided: any) => ({
+      ...provided,
+      color: '#1f2937',
+    }),
+    placeholder: (provided: any) => ({
+      ...provided,
+      color: '#9ca3af',
+    }),
   };
+
+  // Chart data for Monthly Sales
+  const chartData = useMemo(
+    () => ({
+      labels: monthlySales.map((sale) => sale.month),
+      datasets: [
+        {
+          label: 'Total Revenue (₹)',
+          data: monthlySales.map((sale) => sale.totalRevenue),
+          type: 'line' as const,
+          borderColor: 'rgba(59, 130, 246, 1)',
+          backgroundColor: 'rgba(59, 130, 246, 0.2)',
+          fill: true,
+          tension: 0.4,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Total Orders',
+          data: monthlySales.map((sale) => sale.totalOrders),
+          type: 'bar' as const,
+          backgroundColor: 'rgba(34, 197, 94, 0.5)',
+          borderColor: 'rgba(34, 197, 94, 1)',
+          borderWidth: 1,
+          yAxisID: 'y1',
+        },
+      ],
+    }),
+    [monthlySales]
+  );
 
   // StatCard Component
   interface StatCardProps {
@@ -422,77 +484,75 @@ const AdminDashboard: React.FC = () => {
                 Select Station
               </Label>
               <Select
-                value={selectedStation}
-                onValueChange={(value) => {
-                  setSelectedStation(value);
+                options={stationOptions}
+                value={stationOptions.find((option) => option.value === selectedStation) || null}
+                onChange={(option) => {
+                  setSelectedStation(option?.value || '');
                   setSelectedVendor('');
                 }}
-              >
-                <SelectTrigger
-                  id="station"
-                  className="mt-1 text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500"
-                >
-                  <SelectValue placeholder="Select a station" />
-                </SelectTrigger>
-                <SelectContent>
-                  {stations.map((station) => (
-                    <SelectItem key={station.stationId} value={station.stationId.toString()}>
-                      {station.stationName} ({station.stationCode})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Select a station"
+                styles={selectStyles}
+                isClearable
+                className="mt-1"
+              />
             </div>
             <div>
               <Label htmlFor="vendor" className="text-sm font-medium text-blue-700">
                 Select Vendor
               </Label>
               <Select
-                value={selectedVendor}
-                onValueChange={setSelectedVendor}
-                disabled={!selectedStation}
-              >
-                <SelectTrigger
-                  id="vendor"
-                  className="mt-1 text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500"
-                >
-                  <SelectValue placeholder="Select a vendor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendors.map((vendor) => (
-                    <SelectItem key={vendor.vendorId} value={vendor.vendorId.toString()}>
-                      {vendor.businessName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={vendorOptions}
+                value={vendorOptions.find((option) => option.value === selectedVendor) || null}
+                onChange={(option) => setSelectedVendor(option?.value || '')}
+                placeholder="Select a vendor"
+                styles={selectStyles}
+                isClearable
+                isDisabled={!selectedStation}
+                className="mt-1"
+              />
             </div>
             <div>
               <Label htmlFor="startDate" className="text-sm font-medium text-blue-700">
                 Start Date
               </Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={startDate}
-                max={today}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="mt-1 text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500 h-10 w-full"
-              />
+              <div className="mt-1">
+                <DatePicker
+                  id="startDate"
+                  selected={startDate}
+                  onChange={(date: Date | null) => setStartDate(date)}
+                  maxDate={today}
+                  dateFormat="yyyy-MM-dd"
+                  className="w-full text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500 rounded-md h-10 px-3"
+                  placeholderText="Select start date"
+                  showYearDropdown
+                  showMonthDropdown
+                  dropdownMode="select"
+                  popperPlacement="bottom-start"
+                  wrapperClassName="w-full"
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="endDate" className="text-sm font-medium text-blue-700">
                 End Date
               </Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={endDate}
-                max={today}
-                min={startDate || undefined}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="mt-1 text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500 h-10 w-full"
-              />
+              <div className="mt-1">
+                <DatePicker
+                  id="endDate"
+                  selected={endDate}
+                  onChange={(date: Date | null) => setEndDate(date)}
+                  maxDate={today}
+                  minDate={startDate || undefined}
+                  dateFormat="yyyy-MM-dd"
+                  className="w-full text-sm border-blue-300 focus:border-blue-500 focus:ring-blue-500 rounded-md h-10 px-3"
+                  placeholderText="Select end date"
+                  showYearDropdown
+                  showMonthDropdown
+                  dropdownMode="select"
+                  popperPlacement="bottom-start"
+                  wrapperClassName="w-full"
+                />
+              </div>
             </div>
           </div>
           <div className="mt-4 flex justify-end">
@@ -530,7 +590,7 @@ const AdminDashboard: React.FC = () => {
           <CardContent className="p-3 sm:p-6">
             <div className="h-96">
               <Chart
-                type='bar'
+                type="bar"
                 data={chartData}
                 options={{
                   responsive: true,
