@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DollarSign, ShoppingCart, Utensils, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import DatePicker from 'react-datepicker';
@@ -79,10 +78,10 @@ interface ApiParams {
 }
 
 // Define interface for react-select options
-interface SelectOption {
-  value: string;
-  label: string;
-}
+// interface SelectOption {
+//   value: string;
+//   label: string;
+// }
 
 // AdminDashboard Component
 const AdminDashboard: React.FC = () => {
